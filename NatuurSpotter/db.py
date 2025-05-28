@@ -4,12 +4,14 @@ import pymysql
 import os
 from dotenv import load_dotenv
 
+# Laad .env file
 load_dotenv()
 
+# Verbinding maken met MySQL
 connection = pymysql.connect(
     host=os.getenv("DB_HOST", "localhost"),
     user=os.getenv("DB_USER", "root"),
-    password=os.getenv("DB_PASSWORD", ""),
+    password=os.getenv("DB_PASSWORD", ""),  # Let op juiste key!
     database=os.getenv("DB_NAME", "natuurspotter"),
     charset="utf8mb4",
     cursorclass=pymysql.cursors.DictCursor
