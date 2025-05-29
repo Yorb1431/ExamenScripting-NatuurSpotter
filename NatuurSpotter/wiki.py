@@ -1,57 +1,37 @@
 # NatuurSpotter/wiki.py
 
-import os
 import requests
-from dotenv import load_dotenv
-
-# Laadt je .env zodat OPENROUTER_API_KEY beschikbaar is
-load_dotenv()
+from bs4 import BeautifulSoup
 
 
-def generate_description(latin_name: str) -> str:
+def scrape_wikipedia(common_name: str) -> dict:
     """
-    Vraagt via OpenRouter (GPT-3.5-turbo) om een bondige beschrijving
-    (maximaal twee zinnen, 255 karakters) van de keversoort.
+    Probeer eerst de Nederlandstalige Wikipedia-pagina, 
+    en val zonodig terug op Engels.
+    Haal de eerste alinea als ruwe beschrijving.
     """
-    api_key = os.getenv("OPENROUTER_API_KEY")
-    if not api_key or not latin_name:
-        return None
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-        # Optioneel, net als in naming.py
-        "HTTP-Referer": "http://localhost:5000",
-        "X-Title": "NatuurSpotter"
-    }
-
-    prompt = (
-        f"Geef een bondige beschrijving in maximaal twee zinnen "
-        f"(maximaal 255 karakters) van de keversoort '{latin_name}'."
-    )
-
-    payload = {
-        "model": "openai/gpt-3.5-turbo",
-        "messages": [
-            {"role": "user", "content": prompt}
-        ],
-        "max_tokens": 200,
-        "temperature": 0.7
-    }
-
-    try:
-        resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=15
-        )
-        resp.raise_for_status()
-        content = resp.json()
-        text = content["choices"][0]["message"]["content"].strip()
-        # Zorg dat we niet over de limiet van 255 karakters heen gaan
-        return text[:255]
-    except Exception as e:
-        # Log eventuele fouten (in dev-mode zie je ze in de console)
-        print("❌ Error generate_description:", e)
-        return None
+    slug = common_name.replace(" ", "_")
+    urls = [
+        f"https://nl.wikipedia.org/wiki/{slug}",
+        f"https://en.wikipedia.org/wiki/{slug}"
+    ]
+    description = ""
+    for url in urls:
+        try:
+            resp = requests.get(url, timeout=5)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+            # eerste <p> in content
+            p = soup.select_one("div#mw-content-text p")
+            if p:
+                text = p.get_text(strip=True)
+                if text:
+                    description = text
+                    break
+        except Exception:
+            # 404 of parse‐fout → volgende URL
+            continue
+    # crop op max. 255 chars
+    if len(description) > 255:
+        description = description[:252].rsplit(" ", 1)[0] + "..."
+    return {"description": description}

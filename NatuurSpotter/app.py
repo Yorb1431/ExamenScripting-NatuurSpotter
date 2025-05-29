@@ -1,65 +1,75 @@
-import os
+# NatuurSpotter/app.py
+
 from flask import Flask, render_template, request
-from dotenv import load_dotenv
-
-# onze eigen modules
-from NatuurSpotter.db import get_cached, cache_daylist, update_description
 from NatuurSpotter.scraper import scrape_daylist
-from NatuurSpotter.wiki import generate_description
-
-load_dotenv()
+from NatuurSpotter.db import (
+    get_cached,
+    cache_daylist,
+    update_description,
+    get_species_info,
+    save_species_info
+)
+from NatuurSpotter.wiki import scrape_wikipedia
+from NatuurSpotter.naming import to_latin
 
 app = Flask(__name__)
-
-# Configuratie constants (Coleoptera = 16, Hainaut = 23)
 SPECIES_GROUP = 16
 COUNTRY_DIVISION = 23
 
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    date = None
     lang = request.values.get("lang", "nl")
-    date = request.form.get("date")
+    observations = None
 
-    observations = []
-    heat_coords = []
+    if request.method == "POST":
+        date = request.form.get("date")
+        lang = request.form.get("lang", "nl")
+        if date:
+            # 1) probeer cache
+            cached = get_cached(date)
+            if cached:
+                observations = cached
+            else:
+                # 2) fresh scrape
+                fresh = scrape_daylist(date, SPECIES_GROUP, COUNTRY_DIVISION)
+                # zorg dat keys bestaan
+                for rec in fresh:
+                    rec.setdefault("latin_name", None)
+                    rec.setdefault("description", None)
+                    rec.setdefault("photo_link", None)
+                cache_daylist(date, fresh)
+                observations = fresh
 
-    if date:
-        # Eerst proberen uit cache
-        cached = get_cached(date)
-        if cached:
-            observations = cached
-        else:
-            # Anders scrapen en cachen
-            fresh = scrape_daylist(date, SPECIES_GROUP, COUNTRY_DIVISION)
-            cache_daylist(date, fresh)
-            observations = fresh
-
-        # Voor elk record: als er nog geen beschrijving is, opvragen & opslaan
-        for obs in observations:
-            if not obs.get("description"):
-                desc = generate_description(obs["latin_name"])
-                if desc:
-                    update_description(obs["id"], desc)
-                    obs["description"] = desc
+            # 3) vul voor elk record de latin_name & description
+            for obs in observations:
+                info = get_species_info(obs["common_name"])
+                if info:
+                    obs["latin_name"] = info["latin_name"]
+                    obs["description"] = info["description"]
                 else:
-                    obs["description"] = "-"
+                    wiki_data = scrape_wikipedia(obs["common_name"])
+                    latin = to_latin(obs["common_name"])
+                    description = wiki_data.get("description") or ""
+                    save_species_info(obs["common_name"], latin, description)
+                    obs["latin_name"] = latin
+                    obs["description"] = description
+                    update_description(date, obs["common_name"], description)
 
-            # kaart coördinaten verzamelen
-            if obs.get("lat") and obs.get("lon"):
-                try:
-                    lat = float(obs["lat"])
-                    lon = float(obs["lon"])
-                    heat_coords.append([lat, lon])
-                except ValueError:
-                    pass
+    # heatmap‐coördinaten
+    heat_coords = [
+        (o["lat"], o["lon"])
+        for o in (observations or [])
+        if o.get("lat") and o.get("lon")
+    ]
 
     return render_template(
         "index.html",
-        observations=observations,
-        heat_coords=heat_coords,
         date=date,
-        lang=lang
+        lang=lang,
+        observations=observations,
+        heat_coords=heat_coords
     )
 
 

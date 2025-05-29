@@ -3,12 +3,18 @@
 import requests
 from bs4 import BeautifulSoup
 
-BASE = "https://waarnemingen.be"
+# Basis-URL om links compleet te maken
+BASE_URL = "https://waarnemingen.be"
 
 
-def scrape_daylist(date, species_group, country_division):
+def scrape_daylist(date: str, species_group: int, country_division: int):
+    """
+    Scrape de daglijst van waarnemingen voor een bepaalde datum, 
+    soortengroep en provincie. Retourneert een lijst dicts met:
+    count, common_name, latin_name, description (None), place, observer, photo_link.
+    """
     url = (
-        f"{BASE}/fieldwork/observations/daylist/"
+        f"{BASE_URL}/fieldwork/observations/daylist/"
         f"?date={date}"
         f"&species_group={species_group}"
         f"&country_division={country_division}"
@@ -18,34 +24,42 @@ def scrape_daylist(date, species_group, country_division):
     resp.raise_for_status()
     soup = BeautifulSoup(resp.text, "html.parser")
 
-    rows = soup.select("table tbody tr")
-    results = []
-    for tr in rows:
-        # aantal
-        count = tr.select_one("td.text-right").get_text(strip=True)
-        # soorten-cel
-        cell = tr.select_one("td.column-species")
-        common_span = cell.select_one("span.species-common-name")
-        sci_i = cell.select_one("i.species-scientific-name")
-        if common_span:
-            common_name = common_span.get_text(strip=True)
-        else:
-            common_name = sci_i.get_text(strip=True)
+    records = []
+    for tr in soup.select("tbody tr"):
+        # Aantal
+        count = tr.select_one("td:nth-of-type(1)").get_text(strip=True)
 
-        # plaats + waarnemer
-        place = tr.select("td")[4].get_text(strip=True)
-        observer = tr.select("td")[5].get_text(strip=True)
+        # Naam (via <span class="species-common-name">) of fallback op scientific-name
+        common_el = tr.select_one(".species-common-name")
+        scientific_el = tr.select_one(".species-scientific-name")
+        common_name = (
+            common_el.get_text(strip=True)
+            if common_el
+            else (scientific_el.get_text(strip=True) if scientific_el else None)
+        )
 
-        # fotolink
-        photo_a = tr.select_one("td a[href*='/photos/']")
-        photo_link = BASE + photo_a["href"] if photo_a else None
+        # Wetenschappelijke (Latijnse) naam
+        latin_name = scientific_el.get_text(
+            strip=True) if scientific_el else None
 
-        results.append({
+        # Plaats & waarnemer
+        place = tr.select_one("td:nth-of-type(5) a").get_text(strip=True)
+        observer = tr.select_one("td:nth-of-type(6) a").get_text(strip=True)
+
+        # Foto-link (camera-icoon)
+        photo_link = None
+        pic_a = tr.select_one("td:last-of-type a")
+        if pic_a and pic_a.get("href"):
+            photo_link = BASE_URL + pic_a["href"]
+
+        records.append({
             "count": count,
             "common_name": common_name,
+            "latin_name": latin_name,
+            "description": None,        # Vul later via wiki.py / OpenAI
             "place": place,
             "observer": observer,
             "photo_link": photo_link
         })
 
-    return results
+    return records
