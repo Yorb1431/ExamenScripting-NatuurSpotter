@@ -1,43 +1,71 @@
+# NatuurSpotter/scraper.py
+
 import requests
 from bs4 import BeautifulSoup
 
+BASE_URL = "https://waarnemingen.be"
 
-def fetch_data(date):
-    url = f"https://waarnemingen.be/observations/daylist/?datum={date}&groep=7&soort=0&provincie=0&locatie=0"
-    response = requests.get(url)
-    soup = BeautifulSoup(response.content, "html.parser")
 
-    observations = []
+def scrape_daylist(date, species_group, country_division):
+    """
+    Scrape de daylist-pagina voor Coleoptera:
+    - date: "YYYY-MM-DD"
+    - species_group: int (16 voor Coleoptera)
+    - country_division: int (23 voor Henegouwen)
+    Retourneert een lijst dicts met keys:
+      count, common_name, latin_name, place, observer, photo_link
+    """
+    url = f"{BASE_URL}/fieldwork/observations/daylist/"
+    params = {
+        "date":             date,
+        "species_group":    species_group,
+        "country_division": country_division,
+        "rarity":           "",
+        "search":           ""
+    }
+    r = requests.get(url, params=params)
+    r.raise_for_status()
+    soup = BeautifulSoup(r.text, "html.parser")
+    rows = soup.select("table.table-bordered.table-striped tbody tr")
+    out = []
 
-    for row in soup.select("tr[class*=ObservationRow]"):
-        columns = row.select("td")
+    for row in rows:
+        cols = row.find_all("td")
+        # Aantal
+        count = cols[0].get_text(strip=True)
 
-        if len(columns) < 6:
-            continue
+        # Soortnamen: probeer eerst common_name, anders haal alleen scientific-name
+        common_tag = cols[3].select_one(".species-common-name")
+        sci_tag = cols[3].select_one(".species-scientific-name")
+        if common_tag:
+            common_name = common_tag.get_text(strip=True)
+        else:
+            # fallback: gebruik de wetenschappelijke naam
+            common_name = sci_tag.get_text(
+                strip=True) if sci_tag else cols[3].get_text(strip=True)
 
-        try:
-            species = columns[0].select_one("a")
-            observer = columns[1].get_text(strip=True)
-            location = columns[2].get_text(strip=True)
-            count = columns[3].get_text(strip=True)
-            details = columns[5].get_text(strip=True)
+        latin_name = sci_tag.get_text(strip=True) if sci_tag else ""
 
-            latin = species["data-original-title"].strip(
-            ) if "data-original-title" in species.attrs else ""
-            common = species.get_text(strip=True)
+        # Plaats & waarnemer
+        place = cols[4].get_text(strip=True)
+        observer = cols[5].get_text(strip=True)
 
-            if common.lower() == latin.lower() or not common:
-                common = None
+        # Foto‐link (eerste <a> in kolom 6)
+        photo_link = None
+        a = cols[6].find("a", href=True)
+        if a:
+            href = a["href"]
+            # volledige URL
+            photo_link = href if href.startswith("http") else BASE_URL + href
 
-            observations.append({
-                "common_name": common or latin,
-                "latin_name": latin,
-                "observer": observer,
-                "place": location,
-                "count": count,
-                "description": details
-            })
-        except Exception:
-            continue
+        out.append({
+            "count":       count,
+            "common_name": common_name,
+            "latin_name":  latin_name,
+            "place":       place,
+            "observer":    observer,
+            "photo_link":  photo_link,
+            "date":        date
+        })
 
-    return observations
+    return out

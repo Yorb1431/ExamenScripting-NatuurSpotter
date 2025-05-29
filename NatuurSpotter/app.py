@@ -1,54 +1,43 @@
+# NatuurSpotter/app.py
+
+import os
 from flask import Flask, render_template, request
-from NatuurSpotter.db import get_cached, get_species_info, save_species_info, cache_daylist
-from NatuurSpotter.geocode import geocode_place
-from NatuurSpotter.naming import to_latin, to_common
-from datetime import datetime
-from NatuurSpotter.scraper import fetch_data
+from NatuurSpotter.scraper import scrape_daylist
+from NatuurSpotter.db import get_cached, cache_daylist
 
 app = Flask(__name__)
+SPECIES_GROUP = 16
+COUNTRY_DIVISION = 23
 
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    data = []
-    selected_date = ""
-    if request.method == "POST":
-        selected_date = request.form.get("date")
-        try:
-            datetime.strptime(selected_date, "%Y-%m-%d")
-        except ValueError:
-            return render_template("index.html", data=[], error="Ongeldige datum", selected_date=selected_date)
+    lang = request.values.get("lang", "nl")
+    date = request.values.get("date", "")
+    observations = None
+    heat_coords = []
 
-        cached_data = get_cached(selected_date)
-        if cached_data:
-            data = cached_data
+    if request.method == "POST" and date:
+        # kijk in cache
+        cache = get_cached(date)
+        if cache:
+            observations = cache
         else:
-            scraped_data = fetch_data(selected_date)
-            for obs in scraped_data:
-                lat, lon = geocode_place(obs["place"])
-                obs["lat"] = lat
-                obs["lon"] = lon
+            fresh = scrape_daylist(date, SPECIES_GROUP, COUNTRY_DIVISION)
+            cache_daylist(date, fresh)
+            observations = fresh
 
-                species = obs.get("common_name", "").strip()
-                species_info = get_species_info(species)
+    # bouw heatmap-coördinaten als we lat/lon hadden
+    # heat_coords = [(o["lat"],o["lon"]) for o in observations if o.get("lat") and o.get("lon")]
 
-                if not species_info:
-                    latin_name = to_latin(species)
-                    if latin_name.lower() == species.lower() or latin_name.lower() == "onbekend":
-                        latin_name = obs["latin_name"]
-                        common_name = to_common(latin_name)
-                    else:
-                        common_name = species
+    return render_template(
+        "index.html",
+        lang=lang,
+        date=date,
+        observations=observations or [],
+        heat_coords=heat_coords
+    )
 
-                    save_species_info(common_name, latin_name,
-                                      obs["description"])
-                    obs["common_name"] = common_name
-                    obs["latin_name"] = latin_name
-                else:
-                    obs["common_name"] = species_info["common_name"]
-                    obs["latin_name"] = species_info["latin_name"]
 
-            cache_daylist(selected_date, scraped_data)
-            data = scraped_data
-
-    return render_template("index.html", data=data, selected_date=selected_date)
+if __name__ == "__main__":
+    app.run(debug=True)
