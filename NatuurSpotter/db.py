@@ -1,10 +1,8 @@
-# NatuurSpotter/db.py
-
 import os
-from dotenv import load_dotenv
 import pymysql
 
-# laad .env
+# Laadt .env-variabelen als je python-dotenv hebt geïnstalleerd
+from dotenv import load_dotenv
 load_dotenv()
 
 connection = pymysql.connect(
@@ -17,36 +15,48 @@ connection = pymysql.connect(
 )
 
 
-def get_cached(obs_date):
+def get_cached(date):
+    """Haalt alle records voor één datum uit de cache."""
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT * FROM daylist_cache WHERE obs_date = %s",
-            (obs_date,)
+            (date,)
         )
         return cursor.fetchall()
 
 
-def cache_daylist(obs_date, records):
+def cache_daylist(date, records):
+    """Slaat een set opgehaalde waarnemingen in de cache."""
     with connection.cursor() as cursor:
-        for rec in records:
+        for r in records:
             cursor.execute(
                 """
                 INSERT INTO daylist_cache
-                  (obs_date, `count`, common_name, latin_name,
-                   description, place, observer, photo_link)
-                VALUES
-                  (%s,       %s,      %s,          %s,
-                   %s,            %s,    %s,        %s)
+                  (obs_date, `count`, common_name, latin_name, description,
+                   place, observer, photo_link, lat, lon)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 """,
                 (
-                    obs_date,
-                    rec["count"],
-                    rec["common_name"],
-                    rec["latin_name"],
-                    rec["description"],
-                    rec["place"],
-                    rec["observer"],
-                    rec["photo_link"],
+                    date,
+                    r["count"],
+                    r["common_name"],
+                    r["latin_name"],
+                    None,                   # description wordt later ingevuld
+                    r["place"],
+                    r["observer"],
+                    r.get("photo_link"),
+                    r.get("lat"),
+                    r.get("lon"),
                 )
             )
+        connection.commit()
+
+
+def update_description(record_id, description):
+    """Werk de description-kolom bij voor één record."""
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "UPDATE daylist_cache SET description = %s WHERE id = %s",
+            (description, record_id)
+        )
         connection.commit()

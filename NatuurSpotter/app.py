@@ -1,67 +1,65 @@
-# NatuurSpotter/app.py
-
+import os
 from flask import Flask, render_template, request
-from NatuurSpotter.db import get_cached, cache_daylist
+from dotenv import load_dotenv
+
+# onze eigen modules
+from NatuurSpotter.db import get_cached, cache_daylist, update_description
 from NatuurSpotter.scraper import scrape_daylist
-from NatuurSpotter.geocode import geocode_place
-from NatuurSpotter.naming import to_latin
-from NatuurSpotter.wiki import get_description
+from NatuurSpotter.wiki import generate_description
+
+load_dotenv()
 
 app = Flask(__name__)
 
+# Configuratie constants (Coleoptera = 16, Hainaut = 23)
 SPECIES_GROUP = 16
 COUNTRY_DIVISION = 23
-DEFAULT_LAT, DEFAULT_LON = 50.5, 4.1
 
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    lang = request.args.get("lang", "nl")
-    date = None
+    lang = request.values.get("lang", "nl")
+    date = request.form.get("date")
+
     observations = []
     heat_coords = []
 
-    if request.method == "POST":
-        date = request.form["date"]
-        # 1) uit cache?
+    if date:
+        # Eerst proberen uit cache
         cached = get_cached(date)
         if cached:
             observations = cached
-            heat_coords = [
-                (obs["lat"] or DEFAULT_LAT, obs["lon"] or DEFAULT_LON)
-                for obs in cached
-            ]
         else:
-            # 2) fresh scrape
-            raw = scrape_daylist(date, SPECIES_GROUP, COUNTRY_DIVISION)
-            for r in raw:
-                common = r["common_name"]
-                latin = to_latin(common)
-                desc = get_description(common, latin)
-                lat, lon = geocode_place(r["place"])
-                rec = {
-                    "obs_date": date,
-                    "count": r["count"],
-                    "common_name": common,
-                    "latin_name": latin,
-                    "description": desc,
-                    "place": r["place"],
-                    "observer": r["observer"],
-                    "photo_link": r["photo_link"],
-                    "lat": lat,
-                    "lon": lon
-                }
-                observations.append(rec)
-                heat_coords.append((lat or DEFAULT_LAT, lon or DEFAULT_LON))
+            # Anders scrapen en cachen
+            fresh = scrape_daylist(date, SPECIES_GROUP, COUNTRY_DIVISION)
+            cache_daylist(date, fresh)
+            observations = fresh
 
-            cache_daylist(date, observations)
+        # Voor elk record: als er nog geen beschrijving is, opvragen & opslaan
+        for obs in observations:
+            if not obs.get("description"):
+                desc = generate_description(obs["latin_name"])
+                if desc:
+                    update_description(obs["id"], desc)
+                    obs["description"] = desc
+                else:
+                    obs["description"] = "-"
+
+            # kaart coördinaten verzamelen
+            if obs.get("lat") and obs.get("lon"):
+                try:
+                    lat = float(obs["lat"])
+                    lon = float(obs["lon"])
+                    heat_coords.append([lat, lon])
+                except ValueError:
+                    pass
 
     return render_template(
         "index.html",
-        lang=lang,
-        date=date,
         observations=observations,
-        heat_coords=heat_coords
+        heat_coords=heat_coords,
+        date=date,
+        lang=lang
     )
 
 
