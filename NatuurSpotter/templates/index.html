@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ lang }}" class="transition-colors duration-300">
+<html lang="{{ lang }}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -9,98 +9,72 @@
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
-
-  <!-- HEADER -->
-  <header class="flex justify-between items-center p-4 bg-white dark:bg-gray-800 shadow">
+<body class="bg-gray-100 text-gray-900 min-h-screen">
+  <header class="flex justify-between items-center p-4 bg-white shadow">
     <h1 class="text-xl font-bold">
       {% if lang=='nl' %}Keverwaarnemingen{% else %}Beetle Observations{% endif %}
     </h1>
     <div class="flex items-center space-x-4">
-      <form method="get" id="lang-form">
-        <select name="lang" onchange="this.form.submit()"
-                class="bg-gray-100 dark:bg-gray-700 rounded p-1">
+      <form method="get">
+        <select name="lang" onchange="this.form.submit()" class="border p-1">
           <option value="nl" {% if lang=='nl' %}selected{% endif %}>NL</option>
           <option value="en" {% if lang=='en' %}selected{% endif %}>EN</option>
         </select>
       </form>
-      <button id="theme-toggle" class="p-1 rounded bg-gray-200 dark:bg-gray-700">
-        <span id="theme-icon">🌙</span>
-      </button>
     </div>
   </header>
 
-  <!-- MAIN -->
   <main class="p-6 max-w-3xl mx-auto">
     <form method="post" class="mb-6 space-y-4">
       <input type="hidden" name="lang" value="{{ lang }}" />
-      <label>
-        {% if lang=='nl' %}Kies datum:{% else %}Select date:{% endif %}
-      </label>
-      <input type="date" name="date" value="{{ date }}"
-             class="w-full p-2 rounded bg-white dark:bg-gray-800 border" />
-      <button type="submit"
-              class="w-full bg-green-600 hover:bg-green-700 text-white p-2 rounded">
+      <label>{% if lang=='nl' %}Kies datum:{% else %}Select date:{% endif %}</label>
+      <input type="date" name="date" value="{{ date or '' }}" class="w-full p-2 border rounded" />
+      <button type="submit" class="w-full bg-green-600 text-white p-2 rounded">
         {% if lang=='nl' %}Toon waarnemingen{% else %}Show Observations{% endif %}
       </button>
     </form>
 
     {% if observations %}
       <ul class="space-y-4 mb-10">
-        {% for o in observations %}
-          <li class="border rounded p-4 bg-white dark:bg-gray-800">
-            <p><strong>{% if lang=='nl' %}Aantal{% else %}Count{% endif %}:</strong> {{ o.count }}</p>
-            <p><strong>{% if lang=='nl' %}Naam{% else %}Common Name{% endif %}:</strong> {{ o.common_name }}</p>
-            <p><strong>{% if lang=='nl' %}Wetenschappelijke naam{% else %}Latin Name{% endif %}:</strong> {{ o.latin_name }}</p>
-            <p><strong>{% if lang=='nl' %}Plaats{% else %}Location{% endif %}:</strong> {{ o.place }}</p>
-            <p><strong>{% if lang=='nl' %}Waarnemer{% else %}Observer{% endif %}:</strong> {{ o.observer }}</p>
-            {% if o.photo_link %}
+        {% for obs in observations %}
+          <li class="border rounded p-4 bg-white">
+            <p><strong>{% if lang=='nl' %}Aantal{% else %}Count{% endif %}:</strong> {{ obs.count }}</p>
+            <p><strong>{% if lang=='nl' %}Naam{% else %}Common Name{% endif %}:</strong> {{ obs.common_name }}</p>
+            <p><strong>{% if lang=='nl' %}Wetenschappelijke naam{% else %}Latin Name{% endif %}:</strong> {{ obs.latin_name }}</p>
+            <p><strong>{% if lang=='nl' %}Beschrijving{% else %}Description{% endif %}:</strong> {{ obs.description or '-' }}</p>
+            <p><strong>{% if lang=='nl' %}Plaats{% else %}Location{% endif %}:</strong> {{ obs.place }}</p>
+            <p><strong>{% if lang=='nl' %}Waarnemer{% else %}Observer{% endif %}:</strong> {{ obs.observer }}</p>
+            <p><strong>{% if lang=='nl' %}Datum{% else %}Date{% endif %}:</strong> {{ obs.obs_date }}</p>
+
+            {% if obs.photo_link %}
               <p class="mt-2">
-                <a href="{{ o.photo_link }}" target="_blank">📷 Foto</a>
+                <a href="{{ obs.photo_link }}" target="_blank" rel="noopener">
+                  <img src="{{ obs.photo_link }}"
+                       class="w-32 rounded cursor-pointer"
+                       alt="Foto waarneming" />
+                </a>
               </p>
             {% endif %}
           </li>
         {% endfor %}
       </ul>
-    {% else %}
-      {% if date %}
-        <p class="text-red-600">
-          {% if lang=='nl' %}Geen waarnemingen voor {{ date }}.{% else %}No observations for {{ date }}.{% endif %}
-        </p>
-      {% endif %}
     {% endif %}
 
-    <div id="map" class="h-[400px] w-full border rounded overflow-hidden"></div>
+    <div id="map" class="h-[500px] w-full border rounded overflow-hidden"></div>
   </main>
 
   <script>
-    const html = document.documentElement;
-    const btn  = document.getElementById("theme-toggle");
-    const icon = document.getElementById("theme-icon");
-    if (localStorage.getItem("theme")==="dark") {
-      html.classList.add("dark"); icon.textContent="☀️";
-    }
-    btn.addEventListener("click", ()=>{
-      const dark = html.classList.toggle("dark");
-      icon.textContent = dark?"☀️":"🌙";
-      localStorage.setItem("theme", dark?"dark":"light");
-    });
-  </script>
-
-  <script>
     const map = L.map('map').setView([50.5,4.1],9);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OSM contributors'
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+      attribution:'&copy; OSM contributors'
     }).addTo(map);
-
     const heatCoords = {{ heat_coords|tojson }};
     if (heatCoords.length) {
-      L.heatLayer(heatCoords, {radius:20}).addTo(map);
+      L.heatLayer(heatCoords,{radius:20,blur:15}).addTo(map);
       heatCoords.forEach(([lat,lon])=>{
-        L.circleMarker([lat,lon],{radius:4}).addTo(map);
+        L.circleMarker([lat,lon],{radius:4,color:'red'}).addTo(map);
       });
     }
   </script>
-
 </body>
 </html>

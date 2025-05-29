@@ -1,24 +1,39 @@
 # NatuurSpotter/wiki.py
 
+import os
 import requests
 from bs4 import BeautifulSoup
+import openai
+from dotenv import load_dotenv
+
+load_dotenv()
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
-def scrape_wikipedia(common_name: str) -> dict:
-    """
-    Haal van nl.wikipedia.org de titel en eerste alinea op.
-    Als pagina niet bestaat, return lege velden.
-    """
-    slug = common_name.replace(" ", "_")
-    url = f"https://nl.wikipedia.org/wiki/{slug}"
+def get_description(common_name: str, latin_name: str) -> str:
+    # kies Latijnse naam voor Wikipedia-URL, anders common name
+    term = latin_name if latin_name and latin_name != "Unknown" else common_name
+    url = "https://nl.wikipedia.org/wiki/" + term.replace(" ", "_")
+
     try:
-        r = requests.get(url)
+        r = requests.get(url, timeout=5)
         r.raise_for_status()
-    except requests.HTTPError:
-        return {"common": common_name, "description": ""}
+        soup = BeautifulSoup(r.text, "html.parser")
+        para = soup.select_one("div.mw-parser-output > p")
+        if not para:
+            return "-"
+        raw = para.get_text(strip=True)
 
-    soup = BeautifulSoup(r.text, "html.parser")
-    title = soup.find("h1", id="firstHeading").get_text(strip=True)
-    p = soup.select_one("#mw-content-text p")
-    desc = p.get_text(strip=True) if p else ""
-    return {"common": title, "description": desc}
+        # vraag OpenAI om 2-zinnen samenvatting
+        prompt = (
+            f"Vat in twee zinnen samen (in het Nederlands):\n\n{raw}"
+        )
+        comp = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5,
+        )
+        summ = comp.choices[0].message.content.strip()
+        return summ or "-"
+    except Exception:
+        return "-"

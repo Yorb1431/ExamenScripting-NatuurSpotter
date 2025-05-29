@@ -1,17 +1,24 @@
+# NatuurSpotter/naming.py
+
 import os
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
-def to_latin(common_name):
+def to_latin(common_name: str) -> str:
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key or not common_name:
         return "Unknown"
+
     headers = {
         "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
     prompt = (
-        f"Geef alleen de Latijnse naam voor deze keversoort: '{common_name}'."
+        f"Geef enkel de Latijnse naam van de keversoort: “{common_name}”."
+        " Zonder verdere uitleg."
     )
     data = {
         "model": "openai/gpt-3.5-turbo",
@@ -19,13 +26,13 @@ def to_latin(common_name):
         "temperature": 0.0
     }
     try:
-        r = requests.post(
+        resp = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers=headers,
-            json=data,
-            timeout=10
+            json=data
         )
-        r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"].strip()
+        resp.raise_for_status()
+        text = resp.json()["choices"][0]["message"]["content"].strip()
+        return text
     except Exception:
         return "Unknown"
