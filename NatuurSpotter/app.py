@@ -21,20 +21,17 @@ COUNTRY_DIVISION = 23
 def index():
     date = None
     lang = request.values.get("lang", "nl")
-    observations = None
+    observations = []
 
     if request.method == "POST":
         date = request.form.get("date")
         lang = request.form.get("lang", "nl")
         if date:
-            # 1) probeer cache
             cached = get_cached(date)
             if cached:
                 observations = cached
             else:
-                # 2) fresh scrape
                 fresh = scrape_daylist(date, SPECIES_GROUP, COUNTRY_DIVISION)
-                # zorg dat keys bestaan
                 for rec in fresh:
                     rec.setdefault("latin_name", None)
                     rec.setdefault("description", None)
@@ -42,7 +39,6 @@ def index():
                 cache_daylist(date, fresh)
                 observations = fresh
 
-            # 3) vul voor elk record de latin_name & description
             for obs in observations:
                 info = get_species_info(obs["common_name"])
                 if info:
@@ -57,11 +53,11 @@ def index():
                     obs["description"] = description
                     update_description(date, obs["common_name"], description)
 
-    # heatmap‐coördinaten
+    # altijd een lijst, nooit None
     heat_coords = [
         (o["lat"], o["lon"])
-        for o in (observations or [])
-        if o.get("lat") and o.get("lon")
+        for o in observations
+        if o.get("lat") is not None and o.get("lon") is not None
     ]
 
     return render_template(
@@ -69,7 +65,8 @@ def index():
         date=date,
         lang=lang,
         observations=observations,
-        heat_coords=heat_coords
+        heat_coords=heat_coords,
+        coords=heat_coords  # zorgt dat {{ coords|tojson }} altijd bestaat
     )
 
 

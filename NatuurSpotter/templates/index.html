@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ lang }}" class="transition-colors duration-300">
+<html lang="{{ lang }}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -16,27 +16,22 @@
     referrerpolicy="no-referrer"
   />
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
+<body class="bg-gray-900 text-gray-100 min-h-screen">
   <!-- HEADER -->
-  <header class="flex flex-col md:flex-row justify-between items-center p-6 bg-gray-800 text-white shadow">
+  <header class="flex flex-col md:flex-row justify-between items-center p-6 bg-gray-800 text-gray-100 shadow">
     <h1 class="text-2xl font-bold mb-4 md:mb-0">
       {% if lang == 'nl' %}Keverwaarnemingen{% else %}Beetle Observations{% endif %}
     </h1>
-    <div class="flex items-center space-x-4">
-      <form method="get" id="lang-form">
-        <select
-          name="lang"
-          onchange="this.form.submit()"
-          class="p-2 rounded bg-gray-700 border border-gray-600"
-        >
-          <option value="nl" {% if lang == 'nl' %}selected{% endif %}>NL</option>
-          <option value="en" {% if lang == 'en' %}selected{% endif %}>EN</option>
-        </select>
-      </form>
-      <button id="theme-toggle" class="p-2 rounded bg-gray-700">
-        <span id="theme-icon">🌙</span>
-      </button>
-    </div>
+    <form method="get" id="lang-form" class="space-x-2">
+      <select
+        name="lang"
+        onchange="this.form.submit()"
+        class="p-2 rounded bg-gray-700 text-gray-100 border border-gray-600"
+      >
+        <option value="nl" {% if lang == 'nl' %}selected{% endif %}>NL</option>
+        <option value="en" {% if lang == 'en' %}selected{% endif %}>EN</option>
+      </select>
+    </form>
   </header>
 
   <!-- MAIN -->
@@ -52,7 +47,7 @@
           type="date"
           name="date"
           value="{{ date or '' }}"
-          class="p-2 rounded bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600"
+          class="p-2 rounded bg-gray-700 text-gray-100 border border-gray-600"
         />
       </div>
       <button
@@ -66,15 +61,15 @@
     {% if observations %}
     <!-- STATS & FILTER -->
     <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-      <p class="text-gray-600 dark:text-gray-400">
+      <p class="text-gray-300">
         {% if lang=='nl' %}Totaal waarnemingen:{% else %}Total observations:{% endif %}
-        <span class="font-semibold">{{ observations|length }}</span>
+        <span class="font-semibold text-white">{{ observations|length }}</span>
       </p>
       <input
         id="filter-input"
         type="text"
         placeholder="{% if lang=='nl' %}Filter op soort of waarnemer…{% else %}Filter by species or observer…{% endif %}"
-        class="p-2 rounded bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 w-full sm:w-64"
+        class="p-2 rounded bg-gray-700 text-gray-100 border border-gray-600 w-full sm:w-64"
       />
     </div>
 
@@ -85,40 +80,44 @@
            class="lg:w-1/2 space-y-6 overflow-y-auto lg:h-[700px] pr-2">
         {% for obs in observations %}
         <article
-          class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5 shadow hover:shadow-lg transition"
+          class="bg-gray-800 border border-gray-700 rounded-lg p-5 shadow hover:shadow-lg transition"
         >
           <header class="flex justify-between items-start">
             <div>
               <h2 class="text-xl font-semibold">{{ obs.common_name }}</h2>
-              <p class="italic text-gray-500 dark:text-gray-400">{{ obs.latin_name }}</p>
+              <p class="italic text-gray-400">{{ obs.latin_name }}</p>
             </div>
             <a
               href="https://nl.wikipedia.org/wiki/{{ obs.common_name|replace(' ', '_') }}"
               target="_blank"
-              class="text-blue-600 dark:text-blue-400 hover:underline ml-2"
+              class="text-blue-400 hover:underline ml-2"
             ><i class="fas fa-external-link-alt"></i></a>
           </header>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm mt-4">
-            <p><strong>{% if lang=='nl' %}Aantal:{% else %}Count:{% endif %}</strong> {{ obs.count }}</p>
-            <p><strong>{% if lang=='nl' %}Datum:{% else %}Date:{% endif %}</strong> {{ obs.date }}</p>
-            <p><strong>{% if lang=='nl' %}Plaats:{% else %}Location:{% endif %}</strong> {{ obs.place }}</p>
-            <p><strong>{% if lang=='nl' %}Waarnemer:{% else %}Observer:{% endif %}</strong> {{ obs.observer }}</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm mt-4 text-gray-300">
+            <p><strong>Aantal:</strong> {{ obs.count }}</p>
+            <p><strong>Datum:</strong> {{ obs.date }}</p>
+            <p><strong>Plaats:</strong> {{ obs.place }}</p>
+            <p><strong>Waarnemer:</strong> {{ obs.observer }}</p>
           </div>
+
           {% if obs.photo_link %}
-          <figure class="mt-4">
-            <a href="{{ obs.photo_link }}" target="_blank">
-              <img
-                src="{{ obs.photo_link }}"
-                alt="{{ obs.common_name }}"
-                class="w-32 h-32 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
-                loading="lazy"
-              />
+          <p class="mt-4">
+            <a
+              href="{{ obs.photo_link }}"
+              target="_blank"
+              class="text-blue-400 hover:underline"
+            >
+              {% if lang=='nl' %}
+                Druk hier om de {{ obs.common_name }} op foto te zien
+              {% else %}
+                Click here to view photo of {{ obs.common_name }}
+              {% endif %}
             </a>
-            <figcaption class="sr-only">{{ obs.common_name }} photo</figcaption>
-          </figure>
+          </p>
           {% endif %}
+
           {% if obs.description %}
-          <p class="mt-4 text-gray-700 dark:text-gray-300">{{ obs.description }}</p>
+          <p class="mt-4 text-gray-400">{{ obs.description }}</p>
           {% endif %}
         </article>
         {% endfor %}
@@ -126,12 +125,12 @@
 
       <!-- MAP -->
       <div class="lg:w-1/2">
-        <div id="map" class="w-full h-[700px] rounded-lg border border-gray-200 dark:border-gray-700"></div>
+        <div id="map" class="w-full h-[700px] rounded-lg border border-gray-700"></div>
       </div>
     </div>
     {% else %}
       {% if date %}
-      <p class="text-red-600">
+      <p class="text-red-500">
         {% if lang=='nl' %}Geen waarnemingen gevonden voor {{ date }}.{% else %}No observations found for {{ date }}.{% endif %}
       </p>
       {% endif %}
@@ -140,22 +139,8 @@
 
   <!-- SCRIPTS -->
   <script>
-    // Dark/Light toggle
-    const html = document.documentElement;
-    const btn = document.getElementById("theme-toggle");
-    const icon = document.getElementById("theme-icon");
-    if (localStorage.getItem("theme") === "dark") {
-      html.classList.add("dark");
-      icon.textContent = "☀️";
-    }
-    btn.addEventListener("click", () => {
-      const isDark = html.classList.toggle("dark");
-      icon.textContent = isDark ? "☀️" : "🌙";
-      localStorage.setItem("theme", isDark ? "dark" : "light");
-    });
-
     // Client‐side filter
-    document.getElementById('filter-input').addEventListener('input', e => {
+    document.getElementById('filter-input')?.addEventListener('input', e => {
       const q = e.target.value.toLowerCase();
       document.querySelectorAll('#obs-list > article').forEach(card => {
         card.style.display = card.innerText.toLowerCase().includes(q) ? '' : 'none';
