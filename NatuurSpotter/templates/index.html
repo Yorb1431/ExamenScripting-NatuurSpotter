@@ -3,101 +3,176 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{% if lang=='nl' %}Keverwaarnemingen{% else %}Beetle Observations{% endif %}</title>
+  <title>{% if lang == 'nl' %}Keverwaarnemingen{% else %}Beetle Observations{% endif %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    integrity="sha512-pFg0rQQS+P4U2V/6p2yK1Q7Xw19r8TqJQkbb6UJDu3o5H/Bf58vHO7+VN7F0XnW2o7r1vfmE6gTSpb+K0L5cZA=="
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"
+  />
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
-
   <!-- HEADER -->
-  <header class="flex justify-between items-center p-4 bg-white dark:bg-gray-800 shadow">
-    <h1 class="text-xl font-bold">
-      {% if lang=='nl' %}Keverwaarnemingen{% else %}Beetle Observations{% endif %}
+  <header class="flex flex-col md:flex-row justify-between items-center p-6 bg-gray-800 text-white shadow">
+    <h1 class="text-2xl font-bold mb-4 md:mb-0">
+      {% if lang == 'nl' %}Keverwaarnemingen{% else %}Beetle Observations{% endif %}
     </h1>
     <div class="flex items-center space-x-4">
-      <form method="get">
-        <select name="lang" onchange="this.form.submit()" class="bg-gray-100 dark:bg-gray-700 rounded p-1">
-          <option value="nl" {% if lang=='nl' %}selected{% endif %}>NL</option>
-          <option value="en" {% if lang=='en' %}selected{% endif %}>EN</option>
+      <form method="get" id="lang-form">
+        <select
+          name="lang"
+          onchange="this.form.submit()"
+          class="p-2 rounded bg-gray-700 border border-gray-600"
+        >
+          <option value="nl" {% if lang == 'nl' %}selected{% endif %}>NL</option>
+          <option value="en" {% if lang == 'en' %}selected{% endif %}>EN</option>
         </select>
       </form>
-      <button id="theme-toggle" class="p-1 rounded bg-gray-200 dark:bg-gray-700">
+      <button id="theme-toggle" class="p-2 rounded bg-gray-700">
         <span id="theme-icon">🌙</span>
       </button>
     </div>
   </header>
 
   <!-- MAIN -->
-  <main class="p-6 max-w-3xl mx-auto">
-    <form method="post" class="mb-6 space-y-4">
+  <main class="p-6 max-w-7xl mx-auto space-y-6">
+    <!-- DATE FORM -->
+    <form method="post" class="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
       <input type="hidden" name="lang" value="{{ lang }}" />
-      <label class="block font-semibold">{% if lang=='nl' %}Kies datum:{% else %}Select date:{% endif %}</label>
-      <input type="date" name="date" value="{{ date or '' }}" class="w-full p-2 rounded bg-white dark:bg-gray-800 border" />
-      <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white p-2 rounded">
-        {% if lang=='nl' %}Toon waarnemingen{% else %}Show Observations{% endif %}
+      <div class="flex flex-col">
+        <label class="font-medium mb-1">
+          {% if lang == 'nl' %}Kies datum:{% else %}Select date:{% endif %}
+        </label>
+        <input
+          type="date"
+          name="date"
+          value="{{ date or '' }}"
+          class="p-2 rounded bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600"
+        />
+      </div>
+      <button
+        type="submit"
+        class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded whitespace-nowrap"
+      >
+        {% if lang == 'nl' %}Toon waarnemingen{% else %}Show Observations{% endif %}
       </button>
     </form>
 
     {% if observations %}
-      <ul class="space-y-4 mb-10">
+    <!-- STATS & FILTER -->
+    <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+      <p class="text-gray-600 dark:text-gray-400">
+        {% if lang=='nl' %}Totaal waarnemingen:{% else %}Total observations:{% endif %}
+        <span class="font-semibold">{{ observations|length }}</span>
+      </p>
+      <input
+        id="filter-input"
+        type="text"
+        placeholder="{% if lang=='nl' %}Filter op soort of waarnemer…{% else %}Filter by species or observer…{% endif %}"
+        class="p-2 rounded bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 w-full sm:w-64"
+      />
+    </div>
+
+    <!-- LIST & MAP CONTAINER -->
+    <div class="flex flex-col lg:flex-row gap-6">
+      <!-- OBSERVATION LIST -->
+      <div id="obs-list"
+           class="lg:w-1/2 space-y-6 overflow-y-auto lg:h-[700px] pr-2">
         {% for obs in observations %}
-          <li class="border rounded p-4 bg-white dark:bg-gray-800">
-            <p><strong>{% if lang=='nl' %}Aantal{% else %}Count{% endif %}:</strong> {{ obs.count }}</p>
-            <p><strong>{% if lang=='nl' %}Naam{% else %}Common Name{% endif %}:</strong> {{ obs.common_name }}</p>
-            <p><strong>{% if lang=='nl' %}Wetenschappelijke naam{% else %}Latin Name{% endif %}:</strong> {{ obs.latin_name }}</p>
-            <p><strong>{% if lang=='nl' %}Beschrijving{% else %}Description{% endif %}:</strong> {{ obs.description }}</p>
-            <p><strong>{% if lang=='nl' %}Plaats{% else %}Location{% endif %}:</strong> {{ obs.place }}</p>
-            <p><strong>{% if lang=='nl' %}Waarnemer{% else %}Observer{% endif %}:</strong> {{ obs.observer }}</p>
-            <p><strong>{% if lang=='nl' %}Datum{% else %}Date{% endif %}:</strong> {{ obs.obs_date }}</p>
-
-            {% if obs.photo_link %}
-              <div class="mt-2">
-                <a href="{{ obs.photo_link }}" target="_blank" rel="noopener">
-                  <img src="{{ obs.photo_link }}"
-                       alt="Foto waarneming"
-                       class="w-32 h-auto rounded shadow cursor-pointer hover:opacity-80 transition-opacity"/>
-                </a>
-              </div>
-            {% endif %}
-          </li>
+        <article
+          class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5 shadow hover:shadow-lg transition"
+        >
+          <header class="flex justify-between items-start">
+            <div>
+              <h2 class="text-xl font-semibold">{{ obs.common_name }}</h2>
+              <p class="italic text-gray-500 dark:text-gray-400">{{ obs.latin_name }}</p>
+            </div>
+            <a
+              href="https://nl.wikipedia.org/wiki/{{ obs.common_name|replace(' ', '_') }}"
+              target="_blank"
+              class="text-blue-600 dark:text-blue-400 hover:underline ml-2"
+            ><i class="fas fa-external-link-alt"></i></a>
+          </header>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm mt-4">
+            <p><strong>{% if lang=='nl' %}Aantal:{% else %}Count:{% endif %}</strong> {{ obs.count }}</p>
+            <p><strong>{% if lang=='nl' %}Datum:{% else %}Date:{% endif %}</strong> {{ obs.date }}</p>
+            <p><strong>{% if lang=='nl' %}Plaats:{% else %}Location:{% endif %}</strong> {{ obs.place }}</p>
+            <p><strong>{% if lang=='nl' %}Waarnemer:{% else %}Observer:{% endif %}</strong> {{ obs.observer }}</p>
+          </div>
+          {% if obs.photo_link %}
+          <figure class="mt-4">
+            <a href="{{ obs.photo_link }}" target="_blank">
+              <img
+                src="{{ obs.photo_link }}"
+                alt="{{ obs.common_name }}"
+                class="w-32 h-32 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                loading="lazy"
+              />
+            </a>
+            <figcaption class="sr-only">{{ obs.common_name }} photo</figcaption>
+          </figure>
+          {% endif %}
+          {% if obs.description %}
+          <p class="mt-4 text-gray-700 dark:text-gray-300">{{ obs.description }}</p>
+          {% endif %}
+        </article>
         {% endfor %}
-      </ul>
-    {% endif %}
+      </div>
 
-    <div id="map" class="h-[500px] w-full border rounded overflow-hidden"></div>
+      <!-- MAP -->
+      <div class="lg:w-1/2">
+        <div id="map" class="w-full h-[700px] rounded-lg border border-gray-200 dark:border-gray-700"></div>
+      </div>
+    </div>
+    {% else %}
+      {% if date %}
+      <p class="text-red-600">
+        {% if lang=='nl' %}Geen waarnemingen gevonden voor {{ date }}.{% else %}No observations found for {{ date }}.{% endif %}
+      </p>
+      {% endif %}
+    {% endif %}
   </main>
 
-  <!-- Dark mode script (ongewijzigd) -->
+  <!-- SCRIPTS -->
   <script>
+    // Dark/Light toggle
     const html = document.documentElement;
     const btn = document.getElementById("theme-toggle");
     const icon = document.getElementById("theme-icon");
-    if (localStorage.getItem("theme")==="dark") {
+    if (localStorage.getItem("theme") === "dark") {
       html.classList.add("dark");
-      icon.textContent="☀️";
+      icon.textContent = "☀️";
     }
-    btn.addEventListener("click",()=>{
-      html.classList.toggle("dark");
-      const isDark=html.classList.contains("dark");
-      icon.textContent=isDark?"☀️":"🌙";
-      localStorage.setItem("theme", isDark?"dark":"light");
+    btn.addEventListener("click", () => {
+      const isDark = html.classList.toggle("dark");
+      icon.textContent = isDark ? "☀️" : "🌙";
+      localStorage.setItem("theme", isDark ? "dark" : "light");
     });
-  </script>
 
-  <!-- Leaflet + Heatmap -->
-  <script>
-    const map = L.map('map').setView([50.5,4.1],9);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-      attribution:'&copy; OpenStreetMap contributors'
+    // Client‐side filter
+    document.getElementById('filter-input').addEventListener('input', e => {
+      const q = e.target.value.toLowerCase();
+      document.querySelectorAll('#obs-list > article').forEach(card => {
+        card.style.display = card.innerText.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+
+    // Leaflet + heatmap
+    const map = L.map('map').setView([50.5, 4.1], 9);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map);
 
-    const heatCoords = {{ heat_coords|tojson }};
-    if (heatCoords.length>0) {
-      L.heatLayer(heatCoords,{radius:20,blur:15}).addTo(map);
-      heatCoords.forEach(([lat,lon])=>{
-        L.circleMarker([lat,lon],{radius:4,color:'red'}).addTo(map);
+    const heatCoords = {{ heat_coords | tojson }};
+    if (heatCoords.length) {
+      L.heatLayer(heatCoords, { radius: 25 }).addTo(map);
+      heatCoords.forEach(([lat, lon]) => {
+        L.circleMarker([lat, lon], { radius: 5 }).addTo(map);
       });
     }
   </script>
