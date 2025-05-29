@@ -1,7 +1,8 @@
-# NatuurSpotter/naming.py
-
 import os
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def to_latin(common_name):
@@ -16,7 +17,7 @@ def to_latin(common_name):
         "X-Title": "NatuurSpotter"
     }
 
-    prompt = f"Geef de Latijnse naam voor deze keversoort: '{common_name}'. Geef alleen de naam, zonder uitleg."
+    prompt = f"Wat is de Latijnse naam van deze keversoort: '{common_name}'? Geef enkel de Latijnse naam zonder uitleg."
 
     data = {
         "model": "openai/gpt-3.5-turbo",
@@ -28,9 +29,9 @@ def to_latin(common_name):
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data)
         response.raise_for_status()
-        content = response.json()
-        return content["choices"][0]["message"]["content"].strip()
-    except Exception:
+        return response.json()["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        print(f"Fout bij ophalen Latijnse naam: {e}")
         return "Onbekend"
 
 
@@ -46,7 +47,7 @@ def to_common(latin_name):
         "X-Title": "NatuurSpotter"
     }
 
-    prompt = f"Wat is de algemene Nederlandse naam voor de kever met Latijnse naam '{latin_name}'? Geef enkel de gewone naam zonder uitleg."
+    prompt = f"Wat is de Nederlandse naam van deze Latijnse keversoort: '{latin_name}'? Geef enkel de naam, zonder uitleg."
 
     data = {
         "model": "openai/gpt-3.5-turbo",
@@ -58,7 +59,7 @@ def to_common(latin_name):
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions", headers=headers, json=data)
         response.raise_for_status()
-        content = response.json()
-        return content["choices"][0]["message"]["content"].strip()
-    except Exception:
+        return response.json()["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        print(f"Fout bij ophalen gewone naam: {e}")
         return "Onbekend"

@@ -1,55 +1,54 @@
-# NatuurSpotter/app.py
-
 from flask import Flask, render_template, request
 from NatuurSpotter.db import get_cached, get_species_info, save_species_info, cache_daylist
+from NatuurSpotter.geocode import geocode_place
 from NatuurSpotter.naming import to_latin, to_common
 from datetime import datetime
-import os
+from NatuurSpotter.scraper import fetch_data
 
 app = Flask(__name__)
 
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    lang = request.values.get("lang", "nl")
-    date = request.form.get("date") if request.method == "POST" else ""
-    observations = []
-    heat_coords = []
+    data = []
+    selected_date = ""
+    if request.method == "POST":
+        selected_date = request.form.get("date")
+        try:
+            datetime.strptime(selected_date, "%Y-%m-%d")
+        except ValueError:
+            return render_template("index.html", data=[], error="Ongeldige datum", selected_date=selected_date)
 
-    if request.method == "POST" and date:
-        cached = get_cached(date)
-        for obs in cached:
-            species = obs["species"]
-            info = get_species_info(species)
+        cached_data = get_cached(selected_date)
+        if cached_data:
+            data = cached_data
+        else:
+            scraped_data = fetch_data(selected_date)
+            for obs in scraped_data:
+                lat, lon = geocode_place(obs["place"])
+                obs["lat"] = lat
+                obs["lon"] = lon
 
-            # Als info ontbreekt, gebruik AI om de ontbrekende naam aan te vullen
-            if not info:
-                latin = species
-                common = to_common(latin)
-                save_species_info(common, latin)
-            else:
-                latin = info["latin_name"]
-                common = info["common_name"]
+                species = obs.get("common_name", "").strip()
+                species_info = get_species_info(species)
 
-                # Als de namen gelijk zijn, gebruik AI om common te verbeteren
-                if common == latin or common.lower() == "unknown":
-                    common = to_common(latin)
-                    save_species_info(common, latin)
+                if not species_info:
+                    latin_name = to_latin(species)
+                    if latin_name.lower() == species.lower() or latin_name.lower() == "onbekend":
+                        latin_name = obs["latin_name"]
+                        common_name = to_common(latin_name)
+                    else:
+                        common_name = species
 
-            obs["common_name"] = common
-            obs["latin_name"] = latin
-            obs["description"] = info["description"] if info and info["description"] else ""
+                    save_species_info(common_name, latin_name,
+                                      obs["description"])
+                    obs["common_name"] = common_name
+                    obs["latin_name"] = latin_name
+                else:
+                    obs["common_name"] = species_info["common_name"]
+                    obs["latin_name"] = species_info["latin_name"]
 
-            # Voeg coördinaten toe aan heatmap als ze bestaan
-            if obs["lat"] and obs["lon"]:
-                heat_coords.append([float(obs["lat"]), float(obs["lon"])])
+            cache_daylist(selected_date, scraped_data)
+            data = scraped_data
 
-            obs["date"] = obs["obs_date"].strftime(
-                "%Y-%m-%d") if isinstance(obs["obs_date"], datetime) else obs["obs_date"]
-            observations.append(obs)
-
-    return render_template("index.html", observations=observations, date=date, lang=lang, heat_coords=heat_coords)
-
-
-if __name__ == "__main__":
-    app.run(debug=True)
+    return render_template("index.html", data=data, selected_date=selected_date)
