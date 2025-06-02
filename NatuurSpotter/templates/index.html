@@ -82,12 +82,11 @@
            class="lg:w-1/2 space-y-4 overflow-y-auto lg:h-[900px] pr-2">
         {% for obs in observations %}
         <article
-          id="obs-{{ obs.common_name|lower|replace(' ', '-') }}-{{ obs.place|lower|replace(' ', '-') }}"
           class="bg-gray-800 border border-gray-700 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-200 hover:border-green-500"
         >
           <header class="flex justify-between items-start">
             <div>
-              <h2 class="text-xl font-semibold text-white">{{ obs.common_name }}</h2>
+              <h2 class="text-xl font-semibold text-white">{{ obs.common_name.split('-')[0].strip() }}</h2>
               <p class="italic text-gray-400 mt-1">{{ obs.latin_name }}</p>
             </div>
             <a
@@ -103,7 +102,7 @@
             <p><strong class="text-gray-200">{% if lang=='nl' %}Waarnemer:{% else %}Observer:{% endif %}</strong> {{ obs.observer }}</p>
           </div>
 
-          {% if obs.photo_link %}
+          {% if obs.photo_link and obs.photo_link != 'None' %}
           <p class="mt-4">
             <a
               href="{{ obs.photo_link }}"
@@ -118,10 +117,26 @@
               {% endif %}
             </a>
           </p>
+          {% else %}
+          <p class="mt-4 text-gray-400 italic">
+            {% if lang=='nl' %}
+              Geen foto beschikbaar.
+            {% else %}
+              No image available.
+            {% endif %}
+          </p>
           {% endif %}
 
-          {% if obs.description %}
+          {% if obs.description and obs.description != 'None' %}
           <p class="mt-4 text-gray-400 italic">{{ obs.description }}</p>
+          {% else %}
+          <p class="mt-4 text-gray-400 italic">
+            {% if lang=='nl' %}
+              Geen beschrijving beschikbaar.
+            {% else %}
+              No description available.
+            {% endif %}
+          </p>
           {% endif %}
         </article>
         {% endfor %}

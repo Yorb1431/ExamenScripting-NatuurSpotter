@@ -4,7 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 
 
-def scrape_daylist(date: str, species_group: int, country_division: int):
+def scrape_daylist(date: str, species_group: int, country_division: str = ""):
     """
     Scrape een daglijst (bijv. van waarnemingen.be) voor de opgegeven datum,
     species_group en country_division. Geeft een lijst terug van dicts met keys:
@@ -14,12 +14,12 @@ def scrape_daylist(date: str, species_group: int, country_division: int):
     - place       (str)
     - observer    (str)
     - lat         (float of None)
-    - lon         (float of None)
+    - lon         (float of None)   
     """
-    # Pas de URL aan naar de echte bron; dit is een voorbeeldstructuur.
+    # Gebruik de juiste URL-structuur voor waarnemingen.be
     url = (
-        f"https://waarnemingen.be/rbc?"
-        f"acc={species_group}&gebied={country_division}&datum={date}"
+        f"https://waarnemingen.be/fieldwork/observations/daylist/"
+        f"?date={date}&species_group={species_group}&country_division={country_division}&rarity=&search=&page=1"
     )
 
     try:
@@ -30,10 +30,10 @@ def scrape_daylist(date: str, species_group: int, country_division: int):
         return []
 
     soup = BeautifulSoup(resp.text, "html.parser")
-    # Vind de tabel (pas class/id aan op basis van werkelijke HTML)
-    table = soup.find("table", {"class": "waarnemingen-tabel"})
+    # Gebruik de eerste tabel op de pagina (de daglijst-tabel)
+    table = soup.find("table")
     if table is None:
-        # Geen waarnemingen-tabel gevonden → lege lijst
+        # Geen tabel gevonden → lege lijst
         return []
 
     results = []
@@ -45,11 +45,11 @@ def scrape_daylist(date: str, species_group: int, country_division: int):
             continue
 
         # ==== common_name ====
-        name_tag = tr.select_one("td:nth-of-type(3) a")
+        name_tag = tr.select_one("td:nth-of-type(4) a")
         common_name = name_tag.get_text(strip=True) if name_tag else ""
 
         # ==== count ====
-        count_tag = tr.select_one("td:nth-of-type(4)")
+        count_tag = tr.select_one("td:nth-of-type(2)")
         count = count_tag.get_text(strip=True) if count_tag else ""
 
         # ==== place ====
@@ -72,6 +72,19 @@ def scrape_daylist(date: str, species_group: int, country_division: int):
                 lat = None
                 lon = None
 
+        # ==== photo_link (if present) ====
+        photo_link = None
+        # Usually the last <td> contains a link with a camera icon if a photo is present
+        photo_td = tr.select_one("td:last-of-type a")
+        if photo_td and photo_td.get("href"):
+            photo_link = photo_td["href"]
+            # Make absolute if needed
+            if photo_link.startswith("/"):
+                photo_link = f"https://waarnemingen.be{photo_link}"
+
+        # ==== description (not present in table, set to None) ====
+        description = None  # Not available in daylist table, will be filled by LLM/wiki later
+
         results.append({
             "common_name": common_name,
             "count": count,
@@ -80,6 +93,8 @@ def scrape_daylist(date: str, species_group: int, country_division: int):
             "observer": observer,
             "lat": lat,
             "lon": lon,
+            "photo_link": photo_link,
+            "description": description,
         })
 
     return results
