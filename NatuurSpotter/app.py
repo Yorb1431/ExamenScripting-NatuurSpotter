@@ -12,6 +12,9 @@ from NatuurSpotter.db import (
 from NatuurSpotter.wiki import scrape_wikipedia
 from NatuurSpotter.naming import to_latin
 import folium
+from NatuurSpotter.geocode import geocode_place
+import random
+from folium.plugins import HeatMap
 
 app = Flask(__name__)
 SPECIES_GROUP = 16
@@ -69,25 +72,17 @@ def index():
         tiles="CartoDB Dark_Matter"
     )
 
+    # Generate random points in Hainaut for each observation
+    # Hainaut bounding box: lat 50.1–50.8, lon 3.1–4.5 (wider spread)
+    heat_data = []
     for obs in observations:
-        lat = obs.get("lat")
-        lon = obs.get("lon")
-        if lat is not None and lon is not None:
-            # Popup‐tekst: naam + link naar foto (NL/EN)
-            if lang == "nl":
-                link_text = f'Druk hier om de foto van {obs["common_name"]} te zien'
-            else:
-                link_text = f'Click here to view photo of {obs["common_name"]}'
-            popup_html = f"<strong>{obs['common_name']}</strong>"
-            if obs.get("photo_link"):
-                popup_html += f'<br><a href="{obs["photo_link"]}" target="_blank">{link_text}</a>'
+        for _ in range(int(obs.get("count", 1))):
+            lat = random.uniform(50.1, 50.8)
+            lon = random.uniform(3.1, 4.5)
+            heat_data.append([lat, lon])
 
-            # Marker toevoegen (groene marker)
-            folium.Marker(
-                location=[lat, lon],
-                popup=popup_html,
-                icon=folium.Icon(color="lightgreen", icon="bug", prefix="fa")
-            ).add_to(folium_map)
+    if heat_data:
+        HeatMap(heat_data, radius=10, blur=18, min_opacity=0.3, max_zoom=12).add_to(folium_map)
 
     folium_map_html = folium_map._repr_html_()
 

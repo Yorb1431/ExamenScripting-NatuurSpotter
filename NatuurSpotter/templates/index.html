@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{% if lang == 'nl' %}Keverwaarnemingen{% else %}Beetle Observations{% endif %}</title>
+  <title>{% if lang == 'nl' %}Keverwaarnemingen in Henegouwen door Yorbe{% else %}Beetle Observations in Hainaut by Yorbe{% endif %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- We hebben géén Leaflet‐CSS/JS meer nodig omdat we Folium gebruiken -->
   <link
@@ -82,6 +82,7 @@
            class="lg:w-1/2 space-y-4 overflow-y-auto lg:h-[900px] pr-2">
         {% for obs in observations %}
         <article
+          id="obs-{{ obs.common_name|lower|replace(' ', '-') }}-{{ obs.place|lower|replace(' ', '-') }}"
           class="bg-gray-800 border border-gray-700 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-200 hover:border-green-500"
         >
           <header class="flex justify-between items-start">
@@ -152,6 +153,19 @@
         card.style.display = card.innerText.toLowerCase().includes(q) ? '' : 'none';
       });
     });
+
+    // Function to scroll to observation
+    function scrollToObservation(obsId) {
+      const element = document.getElementById(obsId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Add highlight effect
+        element.classList.add('border-green-500');
+        setTimeout(() => {
+          element.classList.remove('border-green-500');
+        }, 2000);
+      }
+    }
   </script>
 </body>
 </html>
