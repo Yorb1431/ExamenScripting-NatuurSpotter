@@ -11,6 +11,7 @@ from NatuurSpotter.db import (
 )
 from NatuurSpotter.wiki import scrape_wikipedia
 from NatuurSpotter.naming import to_latin
+import folium
 
 app = Flask(__name__)
 SPECIES_GROUP = 16
@@ -26,19 +27,25 @@ def index():
     if request.method == "POST":
         date = request.form.get("date")
         lang = request.form.get("lang", "nl")
+
         if date:
+            # 1) Probeer eerst uit cache te halen
             cached = get_cached(date)
             if cached:
                 observations = cached
             else:
+                # 2) Anders fresh scrapen
                 fresh = scrape_daylist(date, SPECIES_GROUP, COUNTRY_DIVISION)
+                # Zorg dat alle velden bestaan
                 for rec in fresh:
                     rec.setdefault("latin_name", None)
                     rec.setdefault("description", None)
                     rec.setdefault("photo_link", None)
+                # In cache opslaan
                 cache_daylist(date, fresh)
                 observations = fresh
 
+            # 3) Vul per record latin_name + description aan
             for obs in observations:
                 info = get_species_info(obs["common_name"])
                 if info:
@@ -53,20 +60,43 @@ def index():
                     obs["description"] = description
                     update_description(date, obs["common_name"], description)
 
-    # altijd een lijst, nooit None
-    heat_coords = [
-        (o["lat"], o["lon"])
-        for o in observations
-        if o.get("lat") is not None and o.get("lon") is not None
-    ]
+    # === Maak de Folium‐map ===
+    # Center in Henegouwen (Hainaut) – ongeveer [50.5, 3.8]
+    # Kies een donker thema (CartoDB Dark Matter)
+    folium_map = folium.Map(
+        location=[50.5, 3.8],
+        zoom_start=9,
+        tiles="CartoDB Dark_Matter"
+    )
+
+    for obs in observations:
+        lat = obs.get("lat")
+        lon = obs.get("lon")
+        if lat is not None and lon is not None:
+            # Popup‐tekst: naam + link naar foto (NL/EN)
+            if lang == "nl":
+                link_text = f'Druk hier om de foto van {obs["common_name"]} te zien'
+            else:
+                link_text = f'Click here to view photo of {obs["common_name"]}'
+            popup_html = f"<strong>{obs['common_name']}</strong>"
+            if obs.get("photo_link"):
+                popup_html += f'<br><a href="{obs["photo_link"]}" target="_blank">{link_text}</a>'
+
+            # Marker toevoegen (groene marker)
+            folium.Marker(
+                location=[lat, lon],
+                popup=popup_html,
+                icon=folium.Icon(color="lightgreen", icon="bug", prefix="fa")
+            ).add_to(folium_map)
+
+    folium_map_html = folium_map._repr_html_()
 
     return render_template(
         "index.html",
         date=date,
         lang=lang,
         observations=observations,
-        heat_coords=heat_coords,
-        coords=heat_coords  # zorgt dat {{ coords|tojson }} altijd bestaat
+        folium_map=folium_map_html
     )
 
 

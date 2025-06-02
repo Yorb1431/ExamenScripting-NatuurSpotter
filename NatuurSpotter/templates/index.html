@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% if lang == 'nl' %}Keverwaarnemingen{% else %}Beetle Observations{% endif %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+  <!-- We hebben géén Leaflet‐CSS/JS meer nodig omdat we Folium gebruiken -->
   <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
@@ -22,7 +20,7 @@
     <h1 class="text-2xl font-bold mb-4 md:mb-0">
       {% if lang == 'nl' %}Keverwaarnemingen{% else %}Beetle Observations{% endif %}
     </h1>
-    <form method="get" id="lang-form" class="space-x-2">
+    <form method="get" id="lang-form">
       <select
         name="lang"
         onchange="this.form.submit()"
@@ -34,19 +32,17 @@
     </form>
   </header>
 
-  <!-- MAIN -->
+  <!-- MAIN CONTENT -->
   <main class="p-6 max-w-7xl mx-auto space-y-6">
     <!-- DATE FORM -->
     <form method="post" class="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
       <input type="hidden" name="lang" value="{{ lang }}" />
       <div class="flex flex-col">
-        <label class="font-medium mb-1">
-          {% if lang == 'nl' %}Kies datum:{% else %}Select date:{% endif %}
-        </label>
         <input
           type="date"
           name="date"
           value="{{ date or '' }}"
+          required
           class="p-2 rounded bg-gray-700 text-gray-100 border border-gray-600"
         />
       </div>
@@ -73,7 +69,7 @@
       />
     </div>
 
-    <!-- LIST & MAP CONTAINER -->
+    <!-- OBSERVATIE‐LIJST & FOLIUM‐MAP -->
     <div class="flex flex-col lg:flex-row gap-6">
       <!-- OBSERVATION LIST -->
       <div id="obs-list"
@@ -88,16 +84,16 @@
               <p class="italic text-gray-400">{{ obs.latin_name }}</p>
             </div>
             <a
-              href="https://nl.wikipedia.org/wiki/{{ obs.common_name|replace(' ', '_') }}"
+              href="https://{{ 'nl.' if lang == 'nl' else 'en.' }}wikipedia.org/wiki/{{ obs.common_name|replace(' ', '_') }}"
               target="_blank"
               class="text-blue-400 hover:underline ml-2"
             ><i class="fas fa-external-link-alt"></i></a>
           </header>
+
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm mt-4 text-gray-300">
-            <p><strong>Aantal:</strong> {{ obs.count }}</p>
-            <p><strong>Datum:</strong> {{ obs.date }}</p>
-            <p><strong>Plaats:</strong> {{ obs.place }}</p>
-            <p><strong>Waarnemer:</strong> {{ obs.observer }}</p>
+            <p><strong>{% if lang=='nl' %}Aantal:{% else %}Count:{% endif %}</strong> {{ obs.count }}</p>
+            <p><strong>{% if lang=='nl' %}Plaats:{% else %}Location:{% endif %}</strong> {{ obs.place }}</p>
+            <p><strong>{% if lang=='nl' %}Waarnemer:{% else %}Observer:{% endif %}</strong> {{ obs.observer }}</p>
           </div>
 
           {% if obs.photo_link %}
@@ -108,7 +104,7 @@
               class="text-blue-400 hover:underline"
             >
               {% if lang=='nl' %}
-                Druk hier om de {{ obs.common_name }} op foto te zien
+                Druk hier om de foto van {{ obs.common_name }} te zien
               {% else %}
                 Click here to view photo of {{ obs.common_name }}
               {% endif %}
@@ -123,9 +119,9 @@
         {% endfor %}
       </div>
 
-      <!-- MAP -->
+      <!-- FOLIUM MAP -->
       <div class="lg:w-1/2">
-        <div id="map" class="w-full h-[700px] rounded-lg border border-gray-700"></div>
+        {{ folium_map|safe }}
       </div>
     </div>
     {% else %}
@@ -139,27 +135,13 @@
 
   <!-- SCRIPTS -->
   <script>
-    // Client‐side filter
+    // Client‐side filter (controleer of filter-input bestaat)
     document.getElementById('filter-input')?.addEventListener('input', e => {
       const q = e.target.value.toLowerCase();
       document.querySelectorAll('#obs-list > article').forEach(card => {
         card.style.display = card.innerText.toLowerCase().includes(q) ? '' : 'none';
       });
     });
-
-    // Leaflet + heatmap
-    const map = L.map('map').setView([50.5, 4.1], 9);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
-    }).addTo(map);
-
-    const heatCoords = {{ heat_coords | tojson }};
-    if (heatCoords.length) {
-      L.heatLayer(heatCoords, { radius: 25 }).addTo(map);
-      heatCoords.forEach(([lat, lon]) => {
-        L.circleMarker([lat, lon], { radius: 5 }).addTo(map);
-      });
-    }
   </script>
 </body>
 </html>
