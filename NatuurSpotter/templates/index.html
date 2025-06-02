@@ -98,8 +98,8 @@
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mt-4 text-gray-300">
             <p><strong class="text-gray-200">{% if lang=='nl' %}Aantal:{% else %}Count:{% endif %}</strong> {{ obs.count }}</p>
-            <p><strong class="text-gray-200">{% if lang=='nl' %}Plaats:{% else %}Location:{% endif %}</strong> {{ obs.place }}</p>
-            <p><strong class="text-gray-200">{% if lang=='nl' %}Waarnemer:{% else %}Observer:{% endif %}</strong> {{ obs.observer }}</p>
+            <p><strong class="text-gray-200">{% if lang=='nl' %}Plaats:{% else %}Location:{% endif %}</strong> {% if obs.place %}{{ obs.place }}{% else %}{% if lang=='nl' %}Plaats niet vermeld{% else %}Location not mentioned{% endif %}{% endif %}</p>
+            <p><strong class="text-gray-200">{% if lang=='nl' %}Waarnemer:{% else %}Observer:{% endif %}</strong> {% if obs.observer %}{{ obs.observer }}{% else %}{% if lang=='nl' %}Waarnemer niet vermeld{% else %}Observer not mentioned{% endif %}{% endif %}</p>
           </div>
 
           {% if obs.photo_link and obs.photo_link != 'None' %}
