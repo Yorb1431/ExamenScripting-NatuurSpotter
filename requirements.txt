@@ -6,3 +6,4 @@ beautifulsoup4
 pymysql
 openai
 python-dotenv
+folium
