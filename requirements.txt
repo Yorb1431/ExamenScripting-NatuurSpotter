@@ -11,3 +11,4 @@ reportlab==4.0.8
 pandas==2.1.4
 matplotlib==3.8.2
 seaborn==0.13.0
+json
