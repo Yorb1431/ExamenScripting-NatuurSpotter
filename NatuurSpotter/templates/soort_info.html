@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>{{ soort_info.naam }}</h1>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Soort Informatie</h5>
+                    <p><strong>Latijnse naam:</strong> {{ soort_info.latijnse_naam }}</p>
+                    <p><strong>Zeldzaamheidsstatus:</strong> {{ soort_info.zeldzaamheid }}</p>
+                    <p><strong>Beschrijving:</strong> {{ soort_info.beschrijving }}</p>
+                    {% if soort_info.photo_link %}
+                    <img src="{{ soort_info.photo_link }}" class="img-fluid" alt="{{ soort_info.naam }}">
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Recente Waarnemingen</h5>
+                    <div class="list-group">
+                        {% for waarneming in recente_waarnemingen %}
+                        <div class="list-group-item">
+                            <h6 class="mb-1">{{ waarneming.datum }}</h6>
+                            <p class="mb-1">Locatie: {{ waarneming.locatie }}</p>
+                            <small>Aantal: {{ waarneming.aantal }}</small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-4 d-flex gap-3">
+        <a href="/soort_info/{{ soort_info.naam }}/pdf" class="btn btn-primary" target="_blank">
+            <i class="fas fa-file-pdf mr-2"></i> Download PDF Rapport
+        </a>
+        <a href="/soort_info/{{ soort_info.naam }}/csv" class="btn btn-secondary" target="_blank">
+            <i class="fas fa-file-csv mr-2"></i> Download CSV Observaties
+        </a>
+    </div>
+</div>
+{% endblock %} 

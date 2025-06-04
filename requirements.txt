@@ -7,3 +7,7 @@ pymysql
 openai
 python-dotenv
 folium
+reportlab
+pandas
+matplotlib
+seaborn

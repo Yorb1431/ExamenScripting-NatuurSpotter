@@ -22,22 +22,42 @@
         <h1 class="text-3xl font-bold text-white tracking-tight">
           {% if lang == 'nl' %}Keverwaarnemingen in Henegouwen door Yorbe{% else %}Beetle Observations in Hainaut by Yorbe{% endif %}
         </h1>
-        <form method="get" id="lang-form" class="flex-shrink-0">
-          <select
-            name="lang"
-            onchange="this.form.submit()"
-            class="px-4 py-2 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-colors"
-          >
-            <option value="nl" {% if lang == 'nl' %}selected{% endif %}>NL</option>
-            <option value="en" {% if lang == 'en' %}selected{% endif %}>EN</option>
-          </select>
-        </form>
+        <div class="flex items-center gap-4">
+          <!-- Navigation Menu -->
+          <!-- Removed navigation bar as requested -->
+          <!-- Language Selector -->
+          <form method="get" id="lang-form" class="flex-shrink-0">
+            <select
+              name="lang"
+              onchange="this.form.submit()"
+              class="px-4 py-2 rounded-lg bg-gray-700 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-colors"
+            >
+              <option value="nl" {% if lang == 'nl' %}selected{% endif %}>NL</option>
+              <option value="en" {% if lang == 'en' %}selected{% endif %}>EN</option>
+            </select>
+          </form>
+        </div>
       </div>
     </div>
   </header>
 
   <!-- MAIN CONTENT -->
   <main class="flex-grow p-6 max-w-7xl mx-auto space-y-8">
+    <!-- BIODIVERSITEIT & CSV EXPORT -->
+    <div class="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700 mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div>
+        <h2 class="text-xl font-bold mb-2">Biodiversiteit</h2>
+        <p><strong>Soortenrijkdom:</strong> {{ soortenrijkdom }}</p>
+        <p><strong>Gemiddelde waarnemingsfrequentie:</strong> {{ "%.2f"|format(waarnemingsfrequentie) }}</p>
+      </div>
+      <form method="post" action="/download_csv">
+        <input type="hidden" name="date" value="{{ date }}">
+        <button type="submit" class="btn btn-primary bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium">
+          <i class="fas fa-file-csv mr-2"></i> Download CSV van deze dag
+        </button>
+      </form>
+    </div>
+
     <!-- DATE FORM -->
     <div class="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700">
       <form method="post" class="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
@@ -86,20 +106,63 @@
         >
           <header class="flex justify-between items-start">
             <div>
-              <h2 class="text-xl font-semibold text-white">{{ obs.common_name.split('-')[0].strip() }}</h2>
-              <p class="italic text-gray-400 mt-1">{{ obs.latin_name }}</p>
+              <h2 class="text-xl font-semibold text-white">{{ obs.species if obs.species is defined else obs.common_name.split('-')[0].strip() }}</h2>
+              <p class="italic text-gray-400 mt-1">{{ obs.latin_name if obs.latin_name is defined else '' }}</p>
             </div>
-            <a
-              href="https://{{ 'nl.' if lang == 'nl' else 'en.' }}wikipedia.org/wiki/{{ obs.common_name|replace(' ', '_') }}"
-              target="_blank"
-              class="text-blue-400 hover:text-blue-300 transition-colors ml-2"
-            ><i class="fas fa-external-link-alt"></i></a>
+            <div class="flex gap-2">
+              <a
+                href="/download_pdf/{{ (obs.species if obs.species is defined else obs.common_name.split('-')[0].strip()) | urlencode }}/{{ obs.date | urlencode }}/{{ obs.observer | urlencode }}"
+                class="text-red-400 hover:text-red-300 transition-colors"
+                title="Download PDF rapport voor deze observatie"
+                target="_blank"
+              >
+                <i class="fas fa-file-pdf"></i>
+              </a>
+              <a
+                href="/soort_info/{{ (obs.species if obs.species is defined else obs.common_name.split('-')[0].strip()) }}"
+                class="text-green-400 hover:text-green-300 transition-colors"
+                title="{% if lang == 'nl' %}Soort informatie{% else %}Species information{% endif %}"
+              >
+                <i class="fas fa-info-circle"></i>
+              </a>
+              <a
+                href="/seizoensanalyse/{{ (obs.species if obs.species is defined else obs.common_name.split('-')[0].strip()) }}/{{ date.split('-')[0] if date else '2024' }}"
+                class="text-blue-400 hover:text-blue-300 transition-colors"
+                title="{% if lang == 'nl' %}Seizoensanalyse{% else %}Seasonal analysis{% endif %}"
+              >
+                <i class="fas fa-chart-line"></i>
+              </a>
+              <a
+                href="https://{{ 'nl.' if lang == 'nl' else 'en.' }}wikipedia.org/wiki/{{ (obs.species if obs.species is defined else obs.common_name)|replace(' ', '_') }}"
+                target="_blank"
+                class="text-blue-400 hover:text-blue-300 transition-colors"
+                title="{% if lang == 'nl' %}Wikipedia{% else %}Wikipedia{% endif %}"
+              >
+                <i class="fas fa-external-link-alt"></i>
+              </a>
+            </div>
           </header>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mt-4 text-gray-300">
             <p><strong class="text-gray-200">{% if lang=='nl' %}Aantal:{% else %}Count:{% endif %}</strong> {{ obs.count }}</p>
             <p><strong class="text-gray-200">{% if lang=='nl' %}Plaats:{% else %}Location:{% endif %}</strong> {% if obs.place %}{{ obs.place }}{% else %}{% if lang=='nl' %}Plaats niet vermeld{% else %}Location not mentioned{% endif %}{% endif %}</p>
             <p><strong class="text-gray-200">{% if lang=='nl' %}Waarnemer:{% else %}Observer:{% endif %}</strong> {% if obs.observer %}{{ obs.observer }}{% else %}{% if lang=='nl' %}Waarnemer niet vermeld{% else %}Observer not mentioned{% endif %}{% endif %}</p>
+          </div>
+
+          <!-- Add PDF Download Button -->
+          <div class="mt-4">
+            <a
+              href="/download_pdf/{{ (obs.species if obs.species is defined else obs.common_name.split('-')[0].strip()) | urlencode }}/{{ obs.date | urlencode }}/{{ obs.observer | urlencode }}"
+              class="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+              target="_blank"
+            >
+              <i class="fas fa-file-pdf mr-2"></i>
+              {% if lang == 'nl' %}
+                Download PDF Rapport
+              {% else %}
+                Download PDF Report
+              {% endif %}
+            </a>
           </div>
 
           {% if obs.photo_link and obs.photo_link != 'None' %}
@@ -111,9 +174,9 @@
             >
               <i class="fas fa-camera mr-2"></i>
               {% if lang=='nl' %}
-                Druk hier om de foto van {{ obs.common_name }} te zien
+                Druk hier om de foto van {{ obs.species if obs.species is defined else obs.common_name }} te zien
               {% else %}
-                Click here to view photo of {{ obs.common_name }}
+                Click here to view photo of {{ obs.species if obs.species is defined else obs.common_name }}
               {% endif %}
             </a>
           </p>

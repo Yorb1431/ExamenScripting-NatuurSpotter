@@ -2,7 +2,36 @@
 
 import requests
 from bs4 import BeautifulSoup
+from datetime import datetime
+from NatuurSpotter.wiki import scrape_wikipedia
 
+
+def get_image_from_wiki(common_name: str) -> str:
+    """Get an image URL from Wikipedia for the given species."""
+    try:
+        # Try Dutch Wikipedia first
+        url = f"https://nl.wikipedia.org/wiki/{common_name.replace(' ', '_')}"
+        resp = requests.get(url, timeout=5)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        
+        # Look for the first image in the infobox
+        infobox = soup.select_one("table.infobox")
+        if infobox:
+            img = infobox.select_one("img")
+            if img and img.get("src"):
+                return f"https:{img['src']}" if img['src'].startswith("//") else img['src']
+        
+        # If no image in infobox, try the first image in the content
+        img = soup.select_one("div#mw-content-text img")
+        if img and img.get("src"):
+            return f"https:{img['src']}" if img['src'].startswith("//") else img['src']
+            
+    except Exception:
+        pass
+    
+    # If no image found, return a default beetle image
+    return "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Beetle_icon.svg/1200px-Beetle_icon.svg.png"
 
 def scrape_daylist(date: str, species_group: int, country_division: str = ""):
     """
@@ -82,8 +111,13 @@ def scrape_daylist(date: str, species_group: int, country_division: str = ""):
             if photo_link.startswith("/"):
                 photo_link = f"https://waarnemingen.be{photo_link}"
 
-        # ==== description (not present in table, set to None) ====
-        description = None  # Not available in daylist table, will be filled by LLM/wiki later
+        # Get description from Wikipedia
+        wiki_info = scrape_wikipedia(common_name)
+        description = wiki_info.get("description", f"Information about {common_name}")
+
+        # Get image from Wikipedia if no photo_link
+        if not photo_link:
+            photo_link = get_image_from_wiki(common_name)
 
         results.append({
             "common_name": common_name,
@@ -98,3 +132,39 @@ def scrape_daylist(date: str, species_group: int, country_division: str = ""):
         })
 
     return results
+
+def scrape_all_observations(date):
+    """
+    Scrape all observations for a given date from waarnemingen.be daylist.
+    Returns a list of dicts: [{species, location, observer, count, ...}, ...]
+    """
+    # Format date as YYYY-MM-DD
+    if isinstance(date, datetime):
+        date_str = date.strftime('%Y-%m-%d')
+    else:
+        date_str = str(date)
+    url = f"https://waarnemingen.be/fieldwork/observations/daylist/?date={date_str}"
+    response = requests.get(url)
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, 'html.parser')
+    table = soup.find('table')
+    if not table:
+        return []
+    rows = table.find_all('tr')[1:]  # skip header
+    observations = []
+    for row in rows:
+        cols = row.find_all('td')
+        if len(cols) < 5:
+            continue
+        species = cols[3].get_text(strip=True)
+        location = cols[4].get_text(strip=True)
+        observer = cols[5].get_text(strip=True) if len(cols) > 5 else ''
+        count = cols[1].get_text(strip=True)
+        observations.append({
+            'species': species,
+            'location': location,
+            'observer': observer,
+            'count': count,
+            'date': date_str
+        })
+    return observations
