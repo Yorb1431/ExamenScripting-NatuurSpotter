@@ -28,6 +28,8 @@ from reportlab.lib import colors
 import urllib.parse
 import os
 import requests
+from bs4 import BeautifulSoup
+from NatuurSpotter.pdf import generate_pdf
 
 app = Flask(__name__)
 SPECIES_GROUP = 16
@@ -37,6 +39,7 @@ COUNTRY_DIVISION = 23
 OUTPUT_DIR = "output"
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
+
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -55,7 +58,8 @@ def index():
                 observations = cached
             else:
                 # 2) Anders scrape alle waarnemingen (alle soorten)
-                observations = scrape_daylist(date, SPECIES_GROUP, COUNTRY_DIVISION)
+                observations = scrape_daylist(
+                    date, SPECIES_GROUP, COUNTRY_DIVISION)
                 # cache_daylist(date, observations)
 
     # Als er geen datum is gekozen, toon niets of vandaag
@@ -86,6 +90,26 @@ def index():
     soortenrijkdom = len(soorten)
     waarnemingsfrequentie = len(observations) / \
         soortenrijkdom if soortenrijkdom else 0
+
+    # Automatically generate and save CSV if observations are found
+    if observations:
+        csv_dir = os.path.join(OUTPUT_DIR, "csv")
+        if not os.path.exists(csv_dir):
+            os.makedirs(csv_dir)
+
+        # Use all keys present in any observation
+        all_keys = set()
+        for obs in observations:
+            all_keys.update(obs.keys())
+        all_keys = list(all_keys)
+        df = pd.DataFrame(observations, columns=all_keys)
+        csv_data = df.to_csv(index=False)
+
+        filename = f"waarnemingen_{date}.csv"
+        filepath = os.path.join(csv_dir, filename)
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(csv_data)
+        print(f"CSV saved to: {filepath}")
 
     return render_template(
         "index.html",
@@ -160,46 +184,8 @@ def download_soort_csv(soort):
     return send_file(csv_file, as_attachment=True)
 
 
-@app.route("/download_csv", methods=["POST"])
-def download_csv():
-    date = request.form.get("date")
-    # Try DB first, else scrape
-    cached = get_cached(date)
-    if cached:
-        observations = cached
-    else:
-        observations = scrape_daylist(date, SPECIES_GROUP, COUNTRY_DIVISION)
-
-    if not observations:
-        return "Geen data beschikbaar voor deze dag.", 404
-
-    # Use all keys present in any observation
-    all_keys = set()
-    for obs in observations:
-        all_keys.update(obs.keys())
-    all_keys = list(all_keys)
-    df = pd.DataFrame(observations, columns=all_keys)
-    csv_data = df.to_csv(index=False)
-
-    # Save CSV to output directory
-    filename = f"waarnemingen_{date}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    filepath = os.path.join(OUTPUT_DIR, filename)
-    with open(filepath, 'w', encoding='utf-8') as f:
-        f.write(csv_data)
-
-    response = make_response(csv_data)
-    response.headers["Content-Disposition"] = f"attachment; filename={filename}"
-    response.headers["Content-Type"] = "text/csv"
-    return response
-
-
 @app.route("/download_pdf/<species>/<date>/<observer>")
 def download_pdf(species, date, observer):
-    # URL decode
-    species = urllib.parse.unquote(species)
-    observer = urllib.parse.unquote(observer)
-    date = urllib.parse.unquote(date)
-    
     # Get species info including description
     species_info = get_species_info(species)
     if not species_info:
@@ -209,87 +195,16 @@ def download_pdf(species, date, observer):
     # Get all observations for this species
     cached = get_cached(date)
     if cached:
-        all_obs = [o for o in cached if (o.get('species', o.get('common_name', '')).split('-')[0].strip() == species)]
+        all_obs = [o for o in cached if (o.get('species', o.get(
+            'common_name', '')).split('-')[0].strip() == species)]
     else:
         all_data = scrape_daylist(date, SPECIES_GROUP, COUNTRY_DIVISION)
-        all_obs = [o for o in all_data if (o.get('species', o.get('common_name', '')).split('-')[0].strip() == species)]
+        all_obs = [o for o in all_data if (o.get('species', o.get(
+            'common_name', '')).split('-')[0].strip() == species)]
 
-    # Get unique locations
-    locations = set()
-    for obs in all_obs:
-        if obs.get('place'):
-            locations.add(obs.get('place'))
-        elif obs.get('location'):
-            locations.add(obs.get('location'))
-
-    # --- Seasonality Graph ---
-    months = [o.get('date', '')[5:7] for o in all_obs if o.get('date')]
-    graph_img = BytesIO()
-    plt.figure(figsize=(6, 3))
-    if months:
-        # Convert months to seasons
-        seasons = []
-        for month in months:
-            month_num = int(month)
-            if month_num in [12, 1, 2]:
-                seasons.append('Winter')
-            elif month_num in [3, 4, 5]:
-                seasons.append('Spring')
-            elif month_num in [6, 7, 8]:
-                seasons.append('Summer')
-            else:
-                seasons.append('Autumn')
-        
-        # Create season count plot
-        sns.countplot(x=seasons, order=['Spring', 'Summer', 'Autumn', 'Winter'])
-        plt.title(f'Seizoenspatroon van {species}')
-        plt.xlabel('Seizoen')
-        plt.ylabel('Aantal waarnemingen')
-    else:
-        plt.text(0.5, 0.5, 'Geen data', ha='center', va='center')
-    plt.tight_layout()
-    plt.savefig(graph_img, format='png')
-    plt.close()
-    graph_img.seek(0)
-
-    # --- PDF Generation ---
-    pdf_buffer = BytesIO()
-    doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
-    styles = getSampleStyleSheet()
-    elements = []
-
-    # Title
-    elements.append(Paragraph(f"<b>{species}</b>", styles['Title']))
-    if species_info.get('latin_name'):
-        elements.append(Paragraph(f"<i>{species_info['latin_name']}</i>", styles['Italic']))
-    elements.append(Spacer(1, 12))
-
-    # Description
-    if species_info.get('description'):
-        elements.append(Paragraph("<b>Beschrijving</b>", styles['Heading3']))
-        elements.append(Paragraph(species_info['description'], styles['Normal']))
-        elements.append(Spacer(1, 12))
-
-    # Locations
-    if locations:
-        elements.append(Paragraph("<b>Gevonden in</b>", styles['Heading3']))
-        for location in sorted(locations):
-            elements.append(Paragraph(f"• {location}", styles['Normal']))
-        elements.append(Spacer(1, 12))
-
-    # Seasonality
-    elements.append(Paragraph("<b>Seizoenspatroon</b>", styles['Heading3']))
-    elements.append(Image(graph_img, width=400, height=200))
-
-    # Build PDF
-    doc.build(elements)
-    pdf_buffer.seek(0)
-
-    # Save PDF to output directory
-    filename = f"{species}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-    filepath = os.path.join(OUTPUT_DIR, filename)
-    with open(filepath, 'wb') as f:
-        f.write(pdf_buffer.getvalue())
+    # Generate PDF
+    pdf_buffer, filename = generate_pdf(
+        species, date, observer, species_info, all_obs)
 
     return send_file(pdf_buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
 

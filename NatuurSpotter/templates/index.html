@@ -50,12 +50,6 @@
         <p><strong>Soortenrijkdom:</strong> {{ soortenrijkdom }}</p>
         <p><strong>Gemiddelde waarnemingsfrequentie:</strong> {{ "%.2f"|format(waarnemingsfrequentie) }}</p>
       </div>
-      <form method="post" action="/download_csv">
-        <input type="hidden" name="date" value="{{ date }}">
-        <button type="submit" class="btn btn-primary bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium">
-          <i class="fas fa-file-csv mr-2"></i> Download CSV van deze dag
-        </button>
-      </form>
     </div>
 
     <!-- DATE FORM -->
