@@ -34,7 +34,7 @@ Gemaakt als examenopdracht voor het vak **Scripting**.
 
 ## 🚀 Installatie
 
-### 1. Repository klonen
+### 1. Repository gebruiken
 ```bash
 git clone https://github.com/Yorb1431/ExamenScripting-NatuurSpotter
 cd ExamenScripting-NatuurSpotter
