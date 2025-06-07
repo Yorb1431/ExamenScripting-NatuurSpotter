@@ -1,17 +1,19 @@
 # NatuurSpotter/wiki.py
+# Wikipedia scraping functionaliteit voor NatuurSpotter
+# Haalt soortinformatie op van Wikipedia pagina's
 
 import requests
 from bs4 import BeautifulSoup
 import re
 
 def clean_text(text: str) -> str:
-    """Clean and format the text, removing extra spaces and newlines."""
+    # Maakt tekst netjes door extra spaties en nieuwe regels te verwijderen
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
 def get_first_paragraph(soup: BeautifulSoup) -> str:
-    """Try to get the first meaningful paragraph from the Wikipedia page."""
-    # Try different selectors to find the first paragraph
+    # Haalt de eerste betekenisvolle paragraaf op van de Wikipedia pagina
+    # Probeert verschillende selectors om de juiste paragraaf te vinden
     selectors = [
         "div#mw-content-text p:not(.mw-empty-elt)",
         "div#mw-content-text p",
@@ -23,13 +25,14 @@ def get_first_paragraph(soup: BeautifulSoup) -> str:
         paragraphs = soup.select(selector)
         for p in paragraphs:
             text = clean_text(p.get_text())
-            # Skip paragraphs that are too short or contain mostly links
+            # Sla paragrafen over die te kort zijn of alleen links bevatten
             if text and len(text) > 20 and not text.startswith("Wikimedia Commons"):
                 return text
     return ""
 
 def get_taxonomy_info(soup: BeautifulSoup) -> str:
-    """Try to get taxonomy information from the infobox."""
+    # Haalt taxonomische informatie op uit de infobox
+    # Verzamelt alle relevante taxonomische details
     infobox = soup.select_one("table.infobox")
     if infobox:
         rows = infobox.select("tr")
@@ -47,20 +50,20 @@ def get_taxonomy_info(soup: BeautifulSoup) -> str:
     return ""
 
 def get_species_description(soup: BeautifulSoup, common_name: str) -> str:
-    """Get a comprehensive description by combining different sources."""
+    # Maakt een uitgebreide beschrijving door verschillende bronnen te combineren
     description_parts = []
     
-    # Get first paragraph
+    # Haal eerste paragraaf op
     first_para = get_first_paragraph(soup)
     if first_para:
         description_parts.append(first_para)
     
-    # Get taxonomy info
+    # Haal taxonomische informatie op
     taxonomy = get_taxonomy_info(soup)
     if taxonomy:
         description_parts.append(f"Taxonomy: {taxonomy}")
     
-    # If we have no description yet, try to get any meaningful content
+    # Als er nog geen beschrijving is, probeer andere betekenisvolle content
     if not description_parts:
         content = soup.select_one("div#mw-content-text")
         if content:
@@ -68,17 +71,16 @@ def get_species_description(soup: BeautifulSoup, common_name: str) -> str:
             if text and len(text) > 50:
                 description_parts.append(text[:500] + "...")
     
-    # If still no description, create a basic one
+    # Als er nog steeds geen beschrijving is, maak een basisbeschrijving
     if not description_parts:
-        description_parts.append(f"{common_name} is a beetle species found in the Hainaut region of Belgium. It belongs to the Coleoptera order of insects.")
+        description_parts.append(f"{common_name} is een kever soort gevonden in de regio Henegouwen in België. Het behoort tot de orde Coleoptera van insecten.")
     
     return " ".join(description_parts)
 
 def scrape_wikipedia(common_name: str) -> dict:
-    """
-    Try to get a description from Wikipedia, with multiple fallback options.
-    Returns a dictionary with a description that's always populated.
-    """
+    # Haalt een beschrijving op van Wikipedia met meerdere fallback opties
+    # Probeert eerst Nederlandse Wikipedia, dan Engelse
+    # Geeft altijd een dictionary terug met een beschrijving
     slug = common_name.replace(" ", "_")
     urls = [
         f"https://nl.wikipedia.org/wiki/{slug}",
@@ -92,21 +94,21 @@ def scrape_wikipedia(common_name: str) -> dict:
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "html.parser")
             
-            # Get comprehensive description
+            # Haal uitgebreide beschrijving op
             description = get_species_description(soup, common_name)
             
-            # If we found something meaningful, break the loop
+            # Als we iets betekenisvols hebben gevonden, stop de loop
             if description and len(description) > 50:
                 break
                 
         except Exception:
             continue
     
-    # If still no description, create a basic one
+    # Als er nog steeds geen beschrijving is, maak een basisbeschrijving
     if not description or len(description) < 50:
-        description = f"{common_name} is a beetle species found in the Hainaut region of Belgium. It belongs to the Coleoptera order of insects, which is the largest order of insects with over 400,000 described species."
+        description = f"{common_name} is een kever soort gevonden in de regio Henegouwen in België. Het behoort tot de orde Coleoptera van insecten, wat de grootste orde van insecten is met meer dan 400.000 beschreven soorten."
     
-    # Ensure the description is not too long
+    # Zorg dat de beschrijving niet te lang is
     if len(description) > 500:
         description = description[:497].rsplit(" ", 1)[0] + "..."
     

@@ -1,4 +1,6 @@
 # NatuurSpotter/app.py
+# Hoofdapplicatie voor de NatuurSpotter website
+# Bevat alle Flask routes en logica voor de webinterface
 
 from flask import Flask, render_template, request, send_file, make_response, jsonify
 from NatuurSpotter.scraper import scrape_daylist, scrape_all_observations
@@ -33,10 +35,10 @@ from bs4 import BeautifulSoup
 from NatuurSpotter.pdf import generate_pdf
 
 app = Flask(__name__)
-SPECIES_GROUP = 16
-COUNTRY_DIVISION = 23
+SPECIES_GROUP = 16  # ID voor vogelsoorten in de database
+COUNTRY_DIVISION = 23  # ID voor België in de database
 
-# Add output directory constant
+# Maak output directory aan voor gegenereerde bestanden
 OUTPUT_DIR = "output"
 if not os.path.exists(OUTPUT_DIR):
     os.makedirs(OUTPUT_DIR)
@@ -44,6 +46,8 @@ if not os.path.exists(OUTPUT_DIR):
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    # Hoofdpagina van de applicatie
+    # Toont waarnemingen voor een gekozen datum met kaart en statistieken
     date = None
     lang = request.values.get("lang", "nl")
     observations = []
@@ -125,6 +129,8 @@ def index():
 
 @app.route("/soort_info/<soort>")
 def soort_info_route(soort):
+    # Toont gedetailleerde informatie over een specifieke soort
+    # Inclusief recente waarnemingen en PDF rapport
     resultaat = soort_info(soort, SPECIES_GROUP)
     if isinstance(resultaat, str):
         return resultaat
@@ -138,6 +144,7 @@ def soort_info_route(soort):
 
 @app.route("/observaties_kaart")
 def observaties_kaart_route():
+    # Genereert een kaart met alle waarnemingen voor een specifieke dag
     dag = request.args.get('dag')
     if dag:
         dag = datetime.strptime(dag, '%Y-%m-%d').date()
@@ -147,6 +154,8 @@ def observaties_kaart_route():
 
 @app.route("/seizoensanalyse/<soort>/<int:jaar>")
 def seizoensanalyse_route(soort, jaar):
+    # Toont seizoensanalyse voor een specifieke soort in een bepaald jaar
+    # Inclusief grafieken en statistische analyse
     resultaat = seizoensanalyse(soort, jaar)
     return render_template(
         "seizoensanalyse.html",
@@ -159,6 +168,8 @@ def seizoensanalyse_route(soort, jaar):
 
 @app.route("/biodiversiteit")
 def biodiversiteit_route():
+    # Toont biodiversiteitsanalyse voor een specifieke maand/jaar
+    # Inclusief soortenrijkdom en waarnemingsfrequentie
     maand = request.args.get('maand', type=int)
     jaar = request.args.get('jaar', type=int)
     resultaat = biodiversiteit_analyse(maand, jaar)
@@ -175,43 +186,76 @@ def biodiversiteit_route():
 
 @app.route("/soort_info/<soort>/pdf")
 def download_soort_pdf(soort):
+    # Download PDF rapport voor een specifieke soort
     resultaat = soort_info(soort, SPECIES_GROUP)
     return send_file(resultaat['pdf_rapport'], as_attachment=True)
 
 
 @app.route("/soort_info/<soort>/csv")
 def download_soort_csv(soort):
+    # Download CSV bestand met waarnemingen voor een specifieke soort
     csv_file = soort_observaties_csv(soort)
     return send_file(csv_file, as_attachment=True)
 
 
 @app.route("/download_pdf/<species>/<date>/<observer>")
 def download_pdf(species, date, observer):
-    # Get species info including description
-    species_info = get_species_info(species)
-    if not species_info:
-        species_info = scrape_wikipedia(species)
-        save_species_info(species, species_info)
+    # Genereert en download een PDF rapport voor een specifieke waarneming
+    # Inclusief soortinformatie, foto's en waarnemingsdetails
+    try:
+        print(f"Starting PDF generation for species: {species}, date: {date}, observer: {observer}")
+        
+        # Get species info including description
+        species_info = get_species_info(species)
+        print(f"Species info from DB: {species_info}")
+        
+        if not species_info:
+            print("No species info found in DB, trying Wikipedia...")
+            species_info = scrape_wikipedia(species)
+            print(f"Species info from Wikipedia: {species_info}")
+            if species_info:
+                print("Saving species info to DB...")
+                save_species_info(
+                    common_name=species,
+                    latin_name=species_info.get('latin_name', ''),
+                    description=species_info.get('description', ''),
+                    photo_link=species_info.get('photo_link', '')
+                )
 
-    # Get all observations for this species
-    cached = get_cached(date)
-    if cached:
-        all_obs = [o for o in cached if (o.get('species', o.get(
-            'common_name', '')).split('-')[0].strip() == species)]
-    else:
-        all_data = scrape_daylist(date, SPECIES_GROUP, COUNTRY_DIVISION)
-        all_obs = [o for o in all_data if (o.get('species', o.get(
-            'common_name', '')).split('-')[0].strip() == species)]
+        # Get all observations for this species
+        print(f"Getting observations for date: {date}")
+        cached = get_cached(date)
+        print(f"Cached observations: {cached}")
+        
+        if cached:
+            all_obs = [o for o in cached if (o.get('species', o.get(
+                'common_name', '')).split('-')[0].strip() == species)]
+        else:
+            print("No cached observations, scraping daylist...")
+            all_data = scrape_daylist(date, SPECIES_GROUP, COUNTRY_DIVISION)
+            all_obs = [o for o in all_data if (o.get('species', o.get(
+                'common_name', '')).split('-')[0].strip() == species)]
+        
+        print(f"Filtered observations: {all_obs}")
 
-    # Generate PDF
-    pdf_buffer, filename = generate_pdf(
-        species, date, observer, species_info, all_obs)
+        # Generate PDF
+        print("Generating PDF...")
+        pdf_buffer, filename = generate_pdf(
+            species, date, observer, species_info, all_obs)
+        print(f"PDF generated successfully: {filename}")
 
-    return send_file(pdf_buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
+        return send_file(pdf_buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
+    except Exception as e:
+        print(f"Error in download_pdf: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        return f"Error generating PDF: {str(e)}", 500
 
 
 @app.route("/api/observaties", methods=["GET"])
 def api_observaties():
+    # API endpoint voor het ophalen van recente waarnemingen
+    # Wordt gebruikt voor real-time updates
     data = get_recent_observations(limit=10)
     return jsonify(data)
 

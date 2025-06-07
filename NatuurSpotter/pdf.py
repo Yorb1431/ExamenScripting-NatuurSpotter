@@ -221,7 +221,7 @@ def create_seasonal_graph(species):
     # Get typical seasonal occurrence from LLM
     try:
         if client:
-            prompt = f"""Provide the typical seasonal occurrence likelihood for the species {species} across the four seasons (Spring, Summer, Autumn, Winter) as a JSON object with season names as keys and percentage as values. Example: {{ \"Spring\": 20, \"Summer\": 60, \"Autumn\": 15, \"Winter\": 5 }}. If the species is not well-known or seasonal data is unavailable, provide {{ \"Spring\": 25, \"Summer\": 25, \"Autumn\": 25, \"Winter\": 25 }}. Do not include any other text.
+            prompt = f"""Provide ONLY the typical seasonal occurrence likelihood for the species {species} across the four seasons (Spring, Summer, Autumn, Winter) as a JSON object with season names as keys and percentage as values. Example: {{ \"Spring\": 20, \"Summer\": 60, \"Autumn\": 15, \"Winter\": 5 }}. If the species is not well-known or seasonal data is unavailable, provide {{ \"Spring\": 25, \"Summer\": 25, \"Autumn\": 25, \"Winter\": 25 }}.
             """
             print(f"Attempting to get seasonal occurrence from LLM for {species}")
             response = client.chat.completions.create(
@@ -238,15 +238,7 @@ def create_seasonal_graph(species):
             
             # Parse the JSON response
             try:
-                # Attempt to load JSON, handle potential leading/trailing non-JSON text
-                # Find the first and last curly braces to isolate the JSON object
-                json_start = seasonal_json_text.find('{')
-                json_end = seasonal_json_text.rfind('}')
-                if json_start != -1 and json_end != -1:
-                    seasonal_json_text_cleaned = seasonal_json_text[json_start : json_end + 1]
-                    seasonal_data_raw = json.loads(seasonal_json_text_cleaned)
-                else:
-                    raise json.JSONDecodeError("JSON object not found in LLM response", seasonal_json_text, 0)
+                seasonal_data_raw = json.loads(seasonal_json_text)
                 
                 # Validate and format the parsed data
                 if all(season in seasonal_data_raw and isinstance(seasonal_data_raw[season], (int, float)) for season in seasons_order):
@@ -298,7 +290,7 @@ def create_seasonal_graph(species):
     graph_img.seek(0)
     
     # We no longer return seasons and season_counts based on observation data here
-    return graph_img, None, None
+    return graph_img, seasonal_data
 
 def generate_pdf(species, date, observer, species_info, observations):
     """Generate PDF report for a species."""
@@ -320,14 +312,17 @@ def generate_pdf(species, date, observer, species_info, observations):
         beetle_image = get_beetle_image(species_info, species)
         
         # Create seasonal graph (now based on LLM typical data)
-        graph_img, _, _ = create_seasonal_graph(species)
+        graph_img, seasonal_data = create_seasonal_graph(species)
         
         # Get seasonal analysis (still based on LLM but potentially using broader knowledge if prompt is adjusted)
-        # For seasonal analysis text, let's call the LLM again with a prompt focused on explaining the typical pattern
         seasonal_analysis = "Geen seizoensanalyse beschikbaar."
         try:
-            if client:
-                prompt_analysis = f"""Leg in het Nederlands uit waarom de {species} typisch het meest wordt waargenomen in bepaalde seizoenen, gebaseerd op biologische en ecologische factoren. Baseer je antwoord op algemene kennis over deze soort en kevers in vergelijkbare habitats.\n\nTypische seizoensdistributie (dit is input voor jou, baseer je uitleg hierop): Spring, Summer, Autumn, Winter. Aantallen/kansen zijn verkregen uit een ander model. Focus op de *redenen* achter het patroon, niet op de exacte percentages.\n"""
+            if client and seasonal_data:
+                # Format the seasonal data for the prompt
+                seasonal_data_formatted = ", ".join([f"{season}: {percentage}%" for season, percentage in seasonal_data.items()])
+                
+                prompt_analysis = f"""Leg in het Nederlands uit waarom de {species} typisch het meest wordt waargenomen in bepaalde seizoenen, gebaseerd op de volgende seizoensdistributie en biologische en ecologische factoren. Baseer je antwoord op algemene kennis over deze soort en kevers in vergelijkbare habitats.\n\nTypische seizoensdistributie: {seasonal_data_formatted}. Focus op de *redenen* achter het patroon.\n"""
+                print(f"Attempting to get seasonal analysis from LLM for {species} with data: {seasonal_data_formatted}")
                 response_analysis = client.chat.completions.create(
                     model="gpt-3.5-turbo", # Or another suitable model
                     messages=[
@@ -336,11 +331,12 @@ def generate_pdf(species, date, observer, species_info, observations):
                     ]
                 )
                 seasonal_analysis = response_analysis.choices[0].message.content.strip()
+                print(f"LLM seasonal analysis response: {seasonal_analysis}")
             else:
-                print("OpenAI client not initialized for seasonal analysis.")
+                print("OpenAI client not initialized or no seasonal data for seasonal analysis.")
         except Exception as e:
             print(f"Error getting seasonal analysis from LLM: {e}")
-
+        
         # Get rarity status
         rarity_status = get_rarity_status(species, species_info.get('description', ''))
         

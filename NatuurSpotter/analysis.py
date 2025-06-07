@@ -1,3 +1,7 @@
+# NatuurSpotter/analysis.py
+# Analyse functionaliteit voor NatuurSpotter
+# Bevat functies voor data-analyse, visualisatie en rapportgeneratie
+
 import folium
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -15,13 +19,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Maak output directory aan voor gegenereerde bestanden
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), '..', 'output')
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 def soort_info(soort, soortgroep):
-    """
-    Toont informatie over een specifieke soort en genereert een PDF rapport.
-    """
+    # Toont gedetailleerde informatie over een specifieke soort
+    # Genereert een PDF rapport met soortinformatie en recente waarnemingen
     cursor = connection.cursor()
     
     # Controleer of de soort tot de toegewezen soortgroep behoort
@@ -46,17 +50,17 @@ def soort_info(soort, soortgroep):
     
     recente_waarnemingen = cursor.fetchall()
     
-    # Genereer PDF rapport (mooier, met tabel en afbeelding)
+    # Genereer PDF rapport met tabel en afbeelding
     pdf_filename = f"rapport_{soort}_{datetime.now().strftime('%Y%m%d')}.pdf"
     doc = SimpleDocTemplate(pdf_filename, pagesize=letter)
     elements = []
     styles = getSampleStyleSheet()
     
-    # Titel
+    # Voeg titel, afbeelding, latijnse naam en beschrijving toe
     elements.append(Paragraph(f"<b>{soort_data['naam']}</b>", styles['Title']))
     elements.append(Spacer(1, 12))
     
-    # Afbeelding (indien beschikbaar)
+    # Voeg afbeelding toe indien beschikbaar
     if soort_data.get('photo_link'):
         try:
             import requests
@@ -69,16 +73,16 @@ def soort_info(soort, soortgroep):
         except Exception:
             pass
     
-    # Latijnse naam en zeldzaamheid
+    # Voeg soortinformatie toe
     elements.append(Paragraph(f"<b>Latijnse naam:</b> {soort_data['latijnse_naam']}", styles['Normal']))
     elements.append(Paragraph(f"<b>Zeldzaamheidsstatus:</b> {soort_data['zeldzaamheid']}", styles['Normal']))
     elements.append(Spacer(1, 12))
     
-    # Beschrijving
+    # Voeg beschrijving toe
     elements.append(Paragraph(soort_data['beschrijving'], styles['BodyText']))
     elements.append(Spacer(1, 18))
     
-    # Recente waarnemingen tabel
+    # Voeg tabel met recente waarnemingen toe
     data = [["Datum", "Aantal", "Locatie"]]
     for w in recente_waarnemingen:
         data.append([str(w['datum']), str(w.get('aantal', 1)), w.get('locatie', '-')])
@@ -102,9 +106,7 @@ def soort_info(soort, soortgroep):
     }
 
 def soort_observaties_csv(soort):
-    """
-    Genereert een CSV-bestand van de 10 recentste waarnemingen van een soort.
-    """
+    # Genereert een CSV-bestand met de 10 recentste waarnemingen van een soort
     cursor = connection.cursor()
     cursor.execute("""
         SELECT o.datum, o.aantal, o.locatie
@@ -121,9 +123,7 @@ def soort_observaties_csv(soort):
     return csv_filename
 
 def observaties_kaart(dag=None):
-    """
-    Genereert een kaart met waarnemingen voor een specifieke dag of vandaag.
-    """
+    # Genereert een interactieve kaart met waarnemingen voor een specifieke dag
     if dag is None:
         dag = date.today()
     
@@ -139,16 +139,16 @@ def observaties_kaart(dag=None):
     
     waarnemingen = cursor.fetchall()
     if not waarnemingen:
-        # No data, return a friendly message or a placeholder file
+        # Geen data, maak een placeholder bestand
         placeholder_path = os.path.join(OUTPUT_DIR, f"geen_kaart_{dag}.html")
         with open(placeholder_path, 'w', encoding='utf-8') as f:
             f.write(f"<html><body><h2>Geen waarnemingen gevonden voor {dag}.</h2></body></html>")
         return placeholder_path
     
-    # Maak een nieuwe kaart gecentreerd op de provincie
+    # Maak een nieuwe kaart gecentreerd op België
     m = folium.Map(location=[51.1657, 4.4317], zoom_start=8)
     
-    # Kleuren voor verschillende soortgroepen
+    # Definieer kleuren voor verschillende soortgroepen
     kleuren = {
         'Vogels': 'red',
         'Vlinders': 'blue',
@@ -172,9 +172,8 @@ def observaties_kaart(dag=None):
     return kaart_bestand
 
 def seizoensanalyse(soort, jaar):
-    """
-    Analyseert seizoensgebonden patronen in waarnemingen.
-    """
+    # Analyseert seizoensgebonden patronen in waarnemingen
+    # Genereert een grafiek en wetenschappelijke analyse
     cursor = connection.cursor()
     
     # Haal alle waarnemingen op voor de gegeven soort en jaar
@@ -189,10 +188,8 @@ def seizoensanalyse(soort, jaar):
     
     data = cursor.fetchall()
     
-    # Maak een DataFrame
+    # Maak een DataFrame en genereer grafiek
     df = pd.DataFrame(data, columns=['maand', 'aantal'])
-    
-    # Maak de grafiek
     plt.figure(figsize=(12, 6))
     sns.barplot(x='maand', y='aantal', data=df)
     plt.title(f'Waarnemingen van {soort} in {jaar}')
@@ -204,7 +201,7 @@ def seizoensanalyse(soort, jaar):
     plt.savefig(grafiek_bestand)
     plt.close()
     
-    # Gebruik OpenAI API voor seizoensanalyse
+    # Gebruik OpenAI voor wetenschappelijke analyse
     openai.api_key = os.getenv('OPENAI_API_KEY')
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
@@ -220,9 +217,8 @@ def seizoensanalyse(soort, jaar):
     }
 
 def biodiversiteit_analyse(maand=None, jaar=None):
-    """
-    Analyseert biodiversiteitsgegevens per maand in een jaar.
-    """
+    # Analyseert biodiversiteitsgegevens per maand in een jaar
+    # Berekent soortenrijkdom en waarnemingsfrequentie
     if maand is None:
         maand = datetime.now().month
     if jaar is None:
@@ -242,10 +238,8 @@ def biodiversiteit_analyse(maand=None, jaar=None):
     
     data = cursor.fetchall()
     
-    # Maak een DataFrame
+    # Maak een DataFrame en bereken statistieken
     df = pd.DataFrame(data, columns=['soort', 'soortgroep', 'aantal_waarnemingen'])
-    
-    # Bereken statistieken
     soortenrijkdom = len(df)
     waarnemingsfrequentie = df['aantal_waarnemingen'].mean() if not df.empty else 0
     dominante_soort = df.iloc[0]['soort'] if not df.empty else 'Geen data'

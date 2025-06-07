@@ -1,10 +1,12 @@
 # NatuurSpotter/db.py
+# Database beheer voor NatuurSpotter
+# Bevat functies voor het opslaan en ophalen van waarnemingen en soortinformatie
 
 import os
 import pymysql
 from pathlib import Path
 
-# **1) Zelf .env inlezen (omdat je python-dotenv niet wilt gebruiken)**
+# Laad .env bestand voor database configuratie
 env_path = Path(__file__).parent.parent / ".env"
 if env_path.exists():
     for line in env_path.read_text().splitlines():
@@ -31,6 +33,7 @@ connection = pymysql.connect(
 
 
 def get_cached(obs_date):
+    # Haal gecachte waarnemingen op voor een specifieke datum
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT * FROM daylist_cache WHERE obs_date = %s",
@@ -40,6 +43,7 @@ def get_cached(obs_date):
 
 
 def cache_daylist(obs_date, records):
+    # Sla waarnemingen op in de cache voor een specifieke datum
     with connection.cursor() as cursor:
         for r in records:
             cursor.execute("""
@@ -63,6 +67,7 @@ def cache_daylist(obs_date, records):
 
 
 def get_species_info(common_name):
+    # Haal informatie op over een specifieke soort
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT * FROM species_info WHERE common_name = %s",
@@ -71,21 +76,24 @@ def get_species_info(common_name):
         return cursor.fetchone()
 
 
-def save_species_info(common_name, latin_name, description):
+def save_species_info(common_name, latin_name, description, photo_link=None):
+    # Sla informatie op over een soort (of werk bestaande informatie bij)
     with connection.cursor() as cursor:
         cursor.execute("""
-            INSERT INTO species_info (common_name, latin_name, description)
-            VALUES (%s, %s, %s)
+            INSERT INTO species_info (common_name, latin_name, description, photo_link)
+            VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+            latin_name = VALUES(latin_name),
+            description = VALUES(description),
+            photo_link = VALUES(photo_link)
             """,
-                       (common_name, latin_name, description)
+                       (common_name, latin_name, description, photo_link)
                        )
         connection.commit()
 
 
 def update_description(obs_date, common_name, description):
-    """
-    Werk de kolom `description` bij in daylist_cache voor één record.
-    """
+    # Werk de beschrijving bij voor een specifieke waarneming
     with connection.cursor() as cursor:
         cursor.execute("""
             UPDATE daylist_cache
@@ -99,6 +107,7 @@ def update_description(obs_date, common_name, description):
 
 
 def get_recent_observations(limit=10):
+    # Haal de meest recente waarnemingen op
     with connection.cursor() as cursor:
         cursor.execute("SELECT * FROM daylist_cache ORDER BY obs_date DESC LIMIT %s", (limit,))
         return cursor.fetchall()
