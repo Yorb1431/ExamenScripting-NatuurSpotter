@@ -1,6 +1,6 @@
 # 🪲 NatuurSpotter
 
-**Een interactieve webapplicatie voor het registreren, analyseren en visualiseren van keverwaarnemingen in België.**  
+**Een interactieve webapplicatie voor het  analyseren en visualiseren van keverwaarnemingen in België.**  
 Gemaakt als examenopdracht voor het vak **Scripting**.
 
 ![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)
