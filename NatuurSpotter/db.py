@@ -96,3 +96,9 @@ def update_description(obs_date, common_name, description):
                        (description, obs_date, common_name)
                        )
     connection.commit()
+
+
+def get_recent_observations(limit=10):
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT * FROM daylist_cache ORDER BY obs_date DESC LIMIT %s", (limit,))
+        return cursor.fetchall()

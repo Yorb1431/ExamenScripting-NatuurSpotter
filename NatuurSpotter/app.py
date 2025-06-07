@@ -1,13 +1,14 @@
 # NatuurSpotter/app.py
 
-from flask import Flask, render_template, request, send_file, make_response
+from flask import Flask, render_template, request, send_file, make_response, jsonify
 from NatuurSpotter.scraper import scrape_daylist, scrape_all_observations
 from NatuurSpotter.db import (
     get_cached,
     cache_daylist,
     update_description,
     get_species_info,
-    save_species_info
+    save_species_info,
+    get_recent_observations
 )
 from NatuurSpotter.wiki import scrape_wikipedia
 from NatuurSpotter.naming import to_latin
@@ -207,6 +208,12 @@ def download_pdf(species, date, observer):
         species, date, observer, species_info, all_obs)
 
     return send_file(pdf_buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
+
+
+@app.route("/api/observaties", methods=["GET"])
+def api_observaties():
+    data = get_recent_observations(limit=10)
+    return jsonify(data)
 
 
 if __name__ == "__main__":

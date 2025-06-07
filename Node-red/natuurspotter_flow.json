@@ -1,0 +1,171 @@
+[
+    {
+        "id": "natuurpotter",
+        "type": "tab",
+        "label": "NatuurSpotter Kevers Yorbe",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "inject_flask_start",
+        "type": "inject",
+        "z": "natuurspotter",
+        "name": "Start Flask App",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.5,
+        "topic": "",
+        "x": 140,
+        "y": 80,
+        "wires": [
+            [
+                "exec_flask_start",
+                "set_status_true"
+            ]
+        ]
+    },
+    {
+        "id": "exec_flask_start",
+        "type": "exec",
+        "z": "natuurspotter",
+        "command": "python -m NatuurSpotter.app",
+        "addpay": false,
+        "append": "",
+        "useSpawn": "true",
+        "timer": "",
+        "winHide": false,
+        "oldrc": false,
+        "name": "Run Flask",
+        "x": 370,
+        "y": 80,
+        "wires": [
+            [],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "set_status_true",
+        "type": "function",
+        "z": "natuurspotter",
+        "name": "status TRUE",
+        "func": "msg.payload = true;\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 360,
+        "y": 130,
+        "wires": [
+            [
+                "ui_flask_status"
+            ]
+        ]
+    },
+    {
+        "id": "ui_flask_status",
+        "type": "ui_text",
+        "z": "natuurspotter",
+        "group": "group_dashboard",
+        "order": 0,
+        "width": 0,
+        "height": 0,
+        "name": "Flask Status",
+        "label": "Flask gestart:",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": "",
+        "color": "#000000",
+        "x": 600,
+        "y": 130,
+        "wires": []
+    },
+    {
+        "id": "inject_update",
+        "type": "inject",
+        "z": "natuurspotter",
+        "name": "Update",
+        "props": [],
+        "repeat": "30",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 3,
+        "topic": "",
+        "x": 120,
+        "y": 200,
+        "wires": [
+            [
+                "http_get_observaties"
+            ]
+        ]
+    },
+    {
+        "id": "http_get_observaties",
+        "type": "http request",
+        "z": "natuurspotter",
+        "name": "GET /api/observaties",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://127.0.0.1:5000/api/observaties",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 410,
+        "y": 200,
+        "wires": [
+            [
+                "ui_template"
+            ]
+        ]
+    },
+    {
+        "id": "ui_template",
+        "type": "ui_template",
+        "z": "natuurspotter",
+        "group": "dashboard",
+        "name": "Observaties UI",
+        "order": 1,
+        "width": 12,
+        "height": 12,
+        "format": "<h3 style=\"margin-bottom: 10px;\">Laatste 10 Waarnemingen</h3>\n<table style=\"width:100%; border-collapse: collapse; font-size: 16px;\">\n  <tr style=\"background-color: #f0f0f0;\">\n    <th style=\"text-align:left; padding:8px;\">Soort</th>\n    <th style=\"text-align:left; padding:8px;\">Waarnemer</th>\n    <th style=\"text-align:left; padding:8px;\">Plaats</th>\n  </tr>\n  <tr ng-repeat=\"obs in msg.payload\">\n    <td style=\"padding:8px;\">{{obs.common_name}}</td>\n    <td style=\"padding:8px;\">{{obs.observer}}</td>\n    <td style=\"padding:8px;\">{{obs.place}}</td>\n  </tr>\n</table>",
+        "storeOutMessages": false,
+        "fwdInMessages": true,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 660,
+        "y": 200,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "dashboard",
+        "type": "ui_group",
+        "name": "NatuurSpotter",
+        "tab": "tab_dashboard",
+        "order": 1,
+        "disp": true,
+        "width": "12",
+        "collapse": false
+    },
+    {
+        "id": "tab_dashboard",
+        "type": "ui_tab",
+        "name": "Live Dashboard",
+        "icon": "dashboard",
+        "order": 1
+    }
+]
